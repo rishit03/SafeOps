@@ -45,3 +45,46 @@ def assign_statuses(current_findings, previous_findings):
             resolved_findings.append(resolved)
 
     return updated_current_findings, resolved_findings
+
+SEVERITY_SCORE = {
+    "critical": 40,
+    "high": 20,
+    "medium": 10,
+    "low": 5
+}
+
+
+def calculate_risk_score(findings):
+    total = 0
+
+    for finding in findings:
+        severity = finding.get("severity", "low")
+        total += SEVERITY_SCORE.get(severity, 5)
+
+    return min(total, 100)
+
+
+def classify_risk_score(score):
+    if score >= 70:
+        return "Critical"
+    if score >= 40:
+        return "High"
+    if score >= 20:
+        return "Moderate"
+    return "Low"
+
+
+def compare_risk_scores(previous_findings, current_findings):
+    prev_score = calculate_risk_score(previous_findings)
+    curr_score = calculate_risk_score(current_findings)
+
+    delta = curr_score - prev_score
+
+    if delta > 0:
+        trend = "Worsened"
+    elif delta < 0:
+        trend = "Improved"
+    else:
+        trend = "No Change"
+
+    return prev_score, curr_score, delta, trend

@@ -1,7 +1,7 @@
 from safeops.config.config_loader import load_config
 
 # Import modules
-from safeops.modules import ssh, ports, exposure, firewall, services
+from safeops.modules import ssh, ports, exposure, firewall, services, file_permissions
 
 
 MODULE_MAP = {
@@ -9,7 +9,8 @@ MODULE_MAP = {
     "ports": ports,
     "exposure": exposure,
     "firewall": firewall,
-    "services": services
+    "services": services,
+    "file_permissions": file_permissions
 }
 
 

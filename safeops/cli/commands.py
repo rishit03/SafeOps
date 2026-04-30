@@ -5,7 +5,12 @@ from safeops.config.config_loader import load_config, update_config_value
 from collections import defaultdict
 from safeops.engine.state_manager import load_state, save_state
 from datetime import datetime
-from safeops.engine.risk_engine import assign_statuses
+from safeops.engine.risk_engine import (
+    assign_statuses,
+    calculate_risk_score,
+    classify_risk_score,
+    compare_risk_scores
+)
 from safeops.alerts.slack import send_slack_alert
 from safeops.fixes.fix_runner import run_fixes
 from safeops.fixes.backup_restore import restore_backup
@@ -43,6 +48,13 @@ def handle_scan(args):
     )
 
     grouped_findings = group_findings_by_severity(current_findings_with_status)
+    risk_score = calculate_risk_score(current_findings_with_status)
+    risk_label = classify_risk_score(risk_score)
+
+    prev_score, curr_score, delta, trend = compare_risk_scores(
+        previous_findings,
+        current_findings_with_status
+    )
 
     config = load_config()
     webhook_url = config.get("slack_webhook_url")
@@ -99,6 +111,17 @@ def handle_scan(args):
     for severity in SEVERITY_ORDER:
         count = len(grouped_findings.get(severity, []))
         print(f"{severity.capitalize():<8}: {count}")
+
+    print()
+
+    print(f"Risk Score : {risk_score}/100")
+    print(f"Risk Level : {risk_label}")
+
+    print()
+
+    print(f"Previous Score : {prev_score}/100")
+    print(f"Current Score  : {curr_score}/100")
+    print(f"Change         : {delta:+} ({trend})")
 
     print()
 
@@ -160,10 +183,19 @@ def handle_status(args):
 
     last_scan_time = state.get("last_scan_time")
     current_findings = state.get("current_findings", [])
+    previous_findings = state.get("previous_findings", [])
     resolved_findings = state.get("resolved_findings", [])
 
     grouped_by_severity = group_findings_by_severity(current_findings)
     grouped_by_status = group_findings_by_status(current_findings)
+
+    risk_score = calculate_risk_score(current_findings)
+    risk_label = classify_risk_score(risk_score)
+
+    prev_score, curr_score, delta, trend = compare_risk_scores(
+        previous_findings,
+        current_findings
+    )
 
     print("\n=== SafeOps Status ===\n")
     print(f"Host: {get_hostname()}")
@@ -180,6 +212,15 @@ def handle_status(args):
     for status in ["new", "existing", "worsened"]:
         count = len(grouped_by_status.get(status, []))
         print(f"{status.capitalize():<9}: {count}")
+
+    print("\nOverall Risk")
+    print("------------")
+    print(f"Risk Score : {risk_score}/100")
+    print(f"Risk Level : {risk_label}")
+    print()
+    print(f"Previous Score : {prev_score}/100")
+    print(f"Current Score  : {curr_score}/100")
+    print(f"Change         : {delta:+} ({trend})")
 
     if current_findings:
         print("\nCurrent Findings")

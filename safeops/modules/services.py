@@ -36,6 +36,22 @@ RISKY_SERVICES = {
 }
 
 
+LOCAL_BIND_ADDRESSES = {
+    "127.0.0.1",
+    "::1",
+    "localhost"
+}
+
+
+def _classify_exposure(ip, base_severity):
+    if ip in LOCAL_BIND_ADDRESSES:
+        if base_severity == "high":
+            return "medium", "Bound to localhost"
+        return base_severity, "Bound to localhost"
+
+    return "high", f"Bound to {ip} (potentially exposed)"
+
+
 def run():
     start_time = time.time()
     findings = []
@@ -57,7 +73,7 @@ def run():
             }
 
         lines = result.stdout.splitlines()
-        detected_ports = set()
+        detected_bindings = set()  # stores (ip, port)
 
         for line in lines[1:]:
             parts = line.split()
@@ -67,21 +83,33 @@ def run():
 
             protocol_info = parts[8]
 
+            if "->" in protocol_info:
+                continue
+
             if ":" in protocol_info:
                 try:
-                    port = int(protocol_info.split(":")[-1])
-                    detected_ports.add(port)
+                    address, port = protocol_info.rsplit(":", 1)
+                    port = int(port)
+                    ip = address.strip()
+
+                    if ip.startswith("*"):
+                        ip = "0.0.0.0"
+
+                    detected_bindings.add((ip, port))
                 except ValueError:
                     continue
 
-        for port, service_info in RISKY_SERVICES.items():
-            if port in detected_ports:
+        for ip, port in detected_bindings:
+            if port in RISKY_SERVICES:
+                service_info = RISKY_SERVICES[port]
+                severity, exposure_note = _classify_exposure(ip, service_info["severity"])
+
                 findings.append(create_finding(
                     issue_id=service_info["issue_id"],
-                    fingerprint=f"{service_info['issue_id']}:{port}",
+                    fingerprint=f"{service_info['issue_id']}:{ip}:{port}",
                     title=f"{service_info['title']} (port {port})",
-                    severity=service_info["severity"],
-                    description=service_info["description"],
+                    severity=severity,
+                    description=f"{service_info['description']} {exposure_note}.",
                     fix=service_info["fix"],
                     auto_fix_supported=False,
                     module="services",
