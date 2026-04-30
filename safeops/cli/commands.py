@@ -52,34 +52,34 @@ def handle_scan(args):
         if f["status"] in ["new", "worsened"] and f["severity"] in ["critical", "high"]
     ]
 
-        if alert_findings and webhook_url:
-            critical_count = len([f for f in alert_findings if f["severity"] == "critical"])
-            high_count = len([f for f in alert_findings if f["severity"] == "high"])
+    if alert_findings and webhook_url:
+        critical_count = len([f for f in alert_findings if f["severity"] == "critical"])
+        high_count = len([f for f in alert_findings if f["severity"] == "high"])
 
-            message_lines = [
-                "SafeOps Alert",
-                "",
-                f"Host: {get_hostname()}",
-                f"Scan Time (UTC): {datetime.utcnow().isoformat()}",
-                "",
-                "Summary:",
-                f"- Critical: {critical_count}",
-                f"- High: {high_count}",
-                "",
-                "New or Worsening Risks:",
-                ""
-            ]
+        message_lines = [
+            "SafeOps Alert",
+            "",
+            f"Host: {get_hostname()}",
+            f"Scan Time (UTC): {datetime.utcnow().isoformat()}",
+            "",
+            "Summary:",
+            f"- Critical: {critical_count}",
+            f"- High: {high_count}",
+            "",
+            "New or Worsening Risks:",
+            ""
+        ]
 
-            for f in alert_findings:
-                message_lines.append(f"[{f['severity'].upper()}][{f['status'].upper()}] {f['title']}")
-
-            message_lines.append("")
-            message_lines.append("Suggested Actions:")
-            message_lines.append("- Run: safeops status")
-            message_lines.append("- Run: safeops fix")
-
-            message = "\n".join(message_lines)
-            send_slack_alert(webhook_url, message)
+        for f in alert_findings:
+            message_lines.append(f"[{f['severity'].upper()}][{f['status'].upper()}] {f['title']}")
+        
+        message_lines.append("")
+        message_lines.append("Suggested Actions:")
+        message_lines.append("- Run: safeops status")
+        message_lines.append("- Run: safeops fix")
+        
+        message = "\n".join(message_lines)
+        send_slack_alert(webhook_url, message)
 
     updated_state = {
         "last_scan_time": datetime.utcnow().isoformat(),

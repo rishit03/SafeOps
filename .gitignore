@@ -23,3 +23,5 @@ dist/
 
 # Local SafeOps runtime data
 .safeops/
+safeops/data/config.json
+safeops/data/state.json
