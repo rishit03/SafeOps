@@ -8,7 +8,9 @@ def create_finding(
     auto_fix_supported,
     module,
     status=None,
-    requires_elevation=False
+    requires_elevation=False,
+    why_it_matters=None,
+    impact=None
 ):
     return {
         "id": issue_id,
@@ -20,5 +22,7 @@ def create_finding(
         "auto_fix_supported": auto_fix_supported,
         "module": module,
         "status": status,
-        "requires_elevation": requires_elevation
+        "requires_elevation": requires_elevation,
+        "why_it_matters": why_it_matters,
+        "impact": impact
     }

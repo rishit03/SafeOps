@@ -38,7 +38,9 @@ def _build_permission_finding(file_path, severity, issue_id, title_suffix, descr
         fix=fix,
         auto_fix_supported=False,
         module="file_permissions",
-        requires_elevation=False
+        requires_elevation=False,
+        why_it_matters="Sensitive data can be accessed by unintended users.",
+        impact="Potential leakage of credentials or secrets."
     )
 
 

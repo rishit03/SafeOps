@@ -50,7 +50,9 @@ def run():
                 fix="Set PermitRootLogin no in sshd_config and restart SSH.",
                 auto_fix_supported=True,
                 module="ssh",
-                requires_elevation=True
+                requires_elevation=True,
+                why_it_matters="If an attacker gains access, they get full control of the system immediately.",
+                impact="High risk of complete system compromise."
             ))
 
         # Check 2: Password authentication
@@ -64,7 +66,9 @@ def run():
                 fix="Set PasswordAuthentication no and use SSH keys.",
                 auto_fix_supported=True,
                 module="ssh",
-                requires_elevation=True
+                requires_elevation=True,
+                why_it_matters="Password-based SSH access is vulnerable to brute-force attacks.",
+                impact="Increased risk of unauthorized access if weak credentials are used."
             ))
 
         return {

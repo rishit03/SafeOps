@@ -1,3 +1,4 @@
+import sys
 import argparse
 import socket
 from safeops.orchestrator.scan_runner import run_scan
@@ -14,6 +15,8 @@ from safeops.engine.risk_engine import (
 from safeops.alerts.slack import send_slack_alert
 from safeops.fixes.fix_runner import run_fixes
 from safeops.fixes.backup_restore import restore_backup
+from safeops.utils.logger import log_info, log_warning, log_error
+from safeops.agent.scheduler import start_scheduler
 
 SEVERITY_ORDER = ["critical", "high", "medium", "low"]
 
@@ -34,11 +37,13 @@ def group_findings_by_severity(findings):
         grouped[severity].append(finding)
     return grouped
 
-def handle_scan(args):
-    print("\n=== SafeOps Scan ===\n")
+def handle_scan(args, silent=False):
+    log_info("Scan started")
 
-    results = run_scan()
     state = load_state()
+    first_run = is_first_run(state)
+    
+    results = run_scan()
     previous_findings = state.get("current_findings", [])
     all_findings = collect_all_findings(results)
 
@@ -48,6 +53,11 @@ def handle_scan(args):
     )
 
     grouped_findings = group_findings_by_severity(current_findings_with_status)
+    has_changes = any(
+        f["status"] in ["new", "worsened"]
+        for f in current_findings_with_status
+    )
+
     risk_score = calculate_risk_score(current_findings_with_status)
     risk_label = classify_risk_score(risk_score)
 
@@ -83,13 +93,15 @@ def handle_scan(args):
         ]
 
         for f in alert_findings:
-            message_lines.append(f"[{f['severity'].upper()}][{f['status'].upper()}] {f['title']}")
-        
+            message_lines.append(
+                f"[{f['severity'].upper()}][{f['status'].upper()}] {f['title']}"
+            )
+
         message_lines.append("")
         message_lines.append("Suggested Actions:")
         message_lines.append("- Run: safeops status")
         message_lines.append("- Run: safeops fix")
-        
+
         message = "\n".join(message_lines)
         send_slack_alert(webhook_url, message)
 
@@ -103,53 +115,76 @@ def handle_scan(args):
 
     save_state(updated_state)
 
-    print(f"Host: {get_hostname()}")
-    print(f"Scan Time (UTC): {updated_state['last_scan_time']}\n")
+    if first_run:
+        print("\n=== Welcome to SafeOps ===\n")
+        print("Quick tips:")
+        print("- Run 'safeops status' to view current posture")
+        print("- Run 'safeops fix' to remediate issues")
+        print("- Configure alerts with 'safeops config set slack_webhook_url <url>'")
+        print("\nThis message will only be shown once.\n")
 
-    print("Summary")
-    print("-------")
-    for severity in SEVERITY_ORDER:
-        count = len(grouped_findings.get(severity, []))
-        print(f"{severity.capitalize():<8}: {count}")
+    if not silent or has_changes:
+        print("\n=== SafeOps Scan ===\n")
 
-    print()
+        print(f"Host: {get_hostname()}")
+        print(f"Scan Time (UTC): {updated_state['last_scan_time']}\n")
 
-    print(f"Risk Score : {risk_score}/100")
-    print(f"Risk Level : {risk_label}")
-
-    print()
-
-    print(f"Previous Score : {prev_score}/100")
-    print(f"Current Score  : {curr_score}/100")
-    print(f"Change         : {delta:+} ({trend})")
-
-    print()
-
-    if current_findings_with_status:
-        print("Findings")
-        print("--------")
+        print("Summary")
+        print("-------")
         for severity in SEVERITY_ORDER:
-            findings = grouped_findings.get(severity, [])
-            if not findings:
-                continue
+            count = len(grouped_findings.get(severity, []))
+            print(f"{severity.capitalize():<8}: {count}")
 
-            print(f"\n{severity.upper()}")
-            for finding in findings:
-                print(f"- {finding['title']}")
-                print(f"  Status : {finding['status']}")
-                print(f"  Module : {finding['module']}")
-                print(f"  Fix    : {finding['fix']}")
+        print()
+        print(f"Risk Score : {risk_score}/100")
+        print(f"Risk Level : {risk_label}")
+
+        print()
+        print(f"Previous Score : {prev_score}/100")
+        print(f"Current Score  : {curr_score}/100")
+        print(f"Change         : {delta:+} ({trend})")
+        print()
+
+        if current_findings_with_status:
+            print("Findings")
+            print("--------")
+            for severity in SEVERITY_ORDER:
+                findings = grouped_findings.get(severity, [])
+                if not findings:
+                    continue
+
+                print(f"\n{severity.upper()}")
+                for finding in findings:
+                    print(f"- {finding['title']}")
+                    print(f"  Status : {finding['status']}")
+                    print(f"  Module : {finding['module']}")
+                    print(f"  Fix    : {finding['fix']}")
+
+                    if finding.get("why_it_matters"):
+                        print(f"  Why    : {finding['why_it_matters']}")
+
+                    if finding.get("impact"):
+                        print(f"  Impact : {finding['impact']}")
+
+        else:
+            print("No findings detected.")
+
+        print("\nModules")
+        print("-------")
+        for result in results:
+            print(f"{result['module']:<16} {result['status']:<8} {result['duration']}s")
+            if result["status"] == "error":
+                print(f"  Error: {result['error']}")
+
+        print()
     else:
-        print("No findings detected.")
+        print("No significant changes detected.")
 
-    print("\nModules")
-    print("-------")
-    for result in results:
-        print(f"{result['module']:<10} {result['status']:<8} {result['duration']}s")
-        if result["status"] == "error":
-            print(f"  Error: {result['error']}")
-
-    print()
+    log_info(
+        f"Scan completed: findings={len(current_findings_with_status)}, "
+        f"risk_score={risk_score}, risk_level={risk_label}, "
+        f"changes_detected={has_changes}"
+    )
 
 def group_findings_by_status(findings):
     grouped = defaultdict(list)
@@ -168,58 +203,125 @@ def handle_fix(args):
         if not findings:
             print(f"No matching issue found for ID: {args.issue_id}")
             return
+        log_info(f"Fix command started for issue_id={args.issue_id}, apply={args.apply}")
     else:
         findings = current_findings
+        log_info(f"Fix command started for all current findings, apply={args.apply}")
 
-    fix_success = run_fixes(findings)
+    fix_success = run_fixes(findings, apply=args.apply)
 
     if fix_success:
+        log_info("At least one fix succeeded")
         print("SafeOps: re-running scan to refresh state...\n")
         handle_scan(args)
+    else:
+        log_warning("No fixes were applied successfully")
 
 
 def handle_status(args):
+
     state = load_state()
 
+    # --- compute everything first ---
+
     last_scan_time = state.get("last_scan_time")
+
     current_findings = state.get("current_findings", [])
+
     previous_findings = state.get("previous_findings", [])
+
     resolved_findings = state.get("resolved_findings", [])
 
     grouped_by_severity = group_findings_by_severity(current_findings)
+
     grouped_by_status = group_findings_by_status(current_findings)
 
     risk_score = calculate_risk_score(current_findings)
+
     risk_label = classify_risk_score(risk_score)
 
     prev_score, curr_score, delta, trend = compare_risk_scores(
+
         previous_findings,
+
         current_findings
+
     )
 
+    # --- SUMMARY MODE FIRST ---
+
+    if args.summary:
+
+        print("\n=== SafeOps Summary ===\n")
+
+        print(f"Host           : {get_hostname()}")
+
+        print(f"Last Scan Time : {last_scan_time if last_scan_time else 'No scans yet'}")
+
+        print(f"Risk Score     : {risk_score}/100")
+
+        print(f"Risk Level     : {risk_label}")
+
+        print(f"Change         : {delta:+} ({trend})")
+
+        print(f"Findings       : {len(current_findings)}")
+
+        print(
+
+            f"Critical/High  : "
+
+            f"{len(grouped_by_severity.get('critical', []))}/"
+
+            f"{len(grouped_by_severity.get('high', []))}"
+
+        )
+
+        print()
+
+        return   # <-- MUST EXIT HERE
+
+    # --- FULL STATUS BELOW ---
+
     print("\n=== SafeOps Status ===\n")
+
     print(f"Host: {get_hostname()}")
+
     print(f"Last Scan Time (UTC): {last_scan_time if last_scan_time else 'No scans yet'}\n")
 
     print("Current Findings by Severity")
+
     print("----------------------------")
+
     for severity in SEVERITY_ORDER:
+
         count = len(grouped_by_severity.get(severity, []))
+
         print(f"{severity.capitalize():<8}: {count}")
 
     print("\nCurrent Findings by Status")
+
     print("--------------------------")
+
     for status in ["new", "existing", "worsened"]:
+
         count = len(grouped_by_status.get(status, []))
+
         print(f"{status.capitalize():<9}: {count}")
 
     print("\nOverall Risk")
+
     print("------------")
+
     print(f"Risk Score : {risk_score}/100")
+
     print(f"Risk Level : {risk_label}")
+
     print()
+
     print(f"Previous Score : {prev_score}/100")
+
     print(f"Current Score  : {curr_score}/100")
+
     print(f"Change         : {delta:+} ({trend})")
 
     if current_findings:
@@ -236,6 +338,13 @@ def handle_status(args):
                 print(f"  Status : {finding['status']}")
                 print(f"  Module : {finding['module']}")
                 print(f"  Fix    : {finding['fix']}")
+
+                if finding.get("why_it_matters"):
+                    print(f"  Why    : {finding['why_it_matters']}")
+
+                if finding.get("impact"):
+                    print(f"  Impact : {finding['impact']}")
+                    
     else:
         print("\nNo current findings.")
 
@@ -253,11 +362,12 @@ def handle_status(args):
 
 
 def handle_start(args):
-    print("SafeOps: starting agent...")
+    log_info("Start command invoked")
+    start_scheduler()
 
 
 def handle_stop(args):
-    print("SafeOps: stopping agent...")
+    print("SafeOps stop is not implemented yet. Use Ctrl+C to stop the scheduler.")
 
 
 def handle_config(args):
@@ -290,6 +400,47 @@ def handle_rollback(args):
     except Exception as e:
         print(f"SafeOps rollback failed: {e}")
 
+def handle_check(args):
+    state = load_state()
+
+    current_findings = state.get("current_findings", [])
+    previous_findings = state.get("previous_findings", [])
+
+    grouped_by_severity = group_findings_by_severity(current_findings)
+
+    risk_score = calculate_risk_score(current_findings)
+    risk_label = classify_risk_score(risk_score)
+
+    prev_score, curr_score, delta, trend = compare_risk_scores(
+        previous_findings,
+        current_findings
+    )
+
+    critical_count = len(grouped_by_severity.get("critical", []))
+    high_count = len(grouped_by_severity.get("high", []))
+
+    print(
+        f"SAFEOPS CHECK: {risk_label.upper()} | "
+        f"score={risk_score} | "
+        f"findings={len(current_findings)} | "
+        f"critical={critical_count} | "
+        f"high={high_count} | "
+        f"trend={trend}"
+    )
+
+    log_info(
+        f"Check command executed: risk_score={risk_score}, "
+        f"risk_level={risk_label}, findings={len(current_findings)}, trend={trend}"
+    )
+
+    exit_code_map = {
+        "Low": 0,
+        "Moderate": 1,
+        "High": 2,
+        "Critical": 3,
+    }
+
+    sys.exit(exit_code_map.get(risk_label, 1))
 
 def build_parser():
     parser = argparse.ArgumentParser(
@@ -304,9 +455,19 @@ def build_parser():
 
     fix_parser = subparsers.add_parser("fix", help="Fix eligible issues")
     fix_parser.add_argument("issue_id", nargs="?", help="Optional issue ID to fix")
+    fix_parser.add_argument(
+        "--apply",
+        action="store_true",
+        help="Apply real fixes instead of running in dry-run mode"
+    )
     fix_parser.set_defaults(func=handle_fix)
 
     status_parser = subparsers.add_parser("status", help="Show current SafeOps status")
+    status_parser.add_argument(
+        "--summary",
+        action="store_true",
+        help="Show a compact summary view"
+    )
     status_parser.set_defaults(func=handle_status)
 
     start_parser = subparsers.add_parser("start", help="Start the SafeOps agent")
@@ -314,6 +475,9 @@ def build_parser():
 
     stop_parser = subparsers.add_parser("stop", help="Stop the SafeOps agent")
     stop_parser.set_defaults(func=handle_stop)
+
+    check_parser = subparsers.add_parser("check", help="Show a one-line SafeOps health summary")
+    check_parser.set_defaults(func=handle_check)
 
     config_parser = subparsers.add_parser("config", help="View or update configuration")
     config_subparsers = config_parser.add_subparsers(dest="action", required=True)
@@ -332,3 +496,6 @@ def build_parser():
     rollback_parser.set_defaults(func=handle_rollback)
 
     return parser
+
+def is_first_run(state):
+    return not state.get("last_scan_time")
