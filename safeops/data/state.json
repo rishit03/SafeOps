@@ -1,0 +1,104 @@
+{
+    "last_scan_time": "2026-04-29T11:13:01.364601",
+    "current_findings": [
+        {
+            "id": "SSH_ROOT_LOGIN",
+            "fingerprint": "SSH_ROOT_LOGIN:/etc/ssh/sshd_config",
+            "title": "SSH root login enabled",
+            "severity": "critical",
+            "description": "Root login over SSH is allowed.",
+            "fix": "Set PermitRootLogin no in sshd_config and restart SSH.",
+            "auto_fix_supported": true,
+            "module": "ssh",
+            "status": "existing",
+            "requires_elevation": true
+        },
+        {
+            "id": "SSH_PASSWORD_AUTH",
+            "fingerprint": "SSH_PASSWORD_AUTH:/etc/ssh/sshd_config",
+            "title": "SSH password authentication enabled",
+            "severity": "high",
+            "description": "SSH allows password-based authentication.",
+            "fix": "Set PasswordAuthentication no and use SSH keys.",
+            "auto_fix_supported": true,
+            "module": "ssh",
+            "status": "existing",
+            "requires_elevation": true
+        }
+    ],
+    "previous_findings": [
+        {
+            "id": "SSH_ROOT_LOGIN",
+            "fingerprint": "SSH_ROOT_LOGIN:/etc/ssh/sshd_config",
+            "title": "SSH root login enabled",
+            "severity": "critical",
+            "description": "Root login over SSH is allowed.",
+            "fix": "Set PermitRootLogin no in sshd_config and restart SSH.",
+            "auto_fix_supported": true,
+            "module": "ssh",
+            "status": "existing",
+            "requires_elevation": true
+        },
+        {
+            "id": "SSH_PASSWORD_AUTH",
+            "fingerprint": "SSH_PASSWORD_AUTH:/etc/ssh/sshd_config",
+            "title": "SSH password authentication enabled",
+            "severity": "high",
+            "description": "SSH allows password-based authentication.",
+            "fix": "Set PasswordAuthentication no and use SSH keys.",
+            "auto_fix_supported": true,
+            "module": "ssh",
+            "status": "existing",
+            "requires_elevation": true
+        }
+    ],
+    "resolved_findings": [],
+    "module_results": [
+        {
+            "module": "ssh",
+            "status": "success",
+            "error": null,
+            "duration": 0.0,
+            "findings": [
+                {
+                    "id": "SSH_ROOT_LOGIN",
+                    "fingerprint": "SSH_ROOT_LOGIN:/etc/ssh/sshd_config",
+                    "title": "SSH root login enabled",
+                    "severity": "critical",
+                    "description": "Root login over SSH is allowed.",
+                    "fix": "Set PermitRootLogin no in sshd_config and restart SSH.",
+                    "auto_fix_supported": true,
+                    "module": "ssh",
+                    "status": null,
+                    "requires_elevation": true
+                },
+                {
+                    "id": "SSH_PASSWORD_AUTH",
+                    "fingerprint": "SSH_PASSWORD_AUTH:/etc/ssh/sshd_config",
+                    "title": "SSH password authentication enabled",
+                    "severity": "high",
+                    "description": "SSH allows password-based authentication.",
+                    "fix": "Set PasswordAuthentication no and use SSH keys.",
+                    "auto_fix_supported": true,
+                    "module": "ssh",
+                    "status": null,
+                    "requires_elevation": true
+                }
+            ]
+        },
+        {
+            "module": "ports",
+            "status": "success",
+            "error": null,
+            "duration": 0.028,
+            "findings": []
+        },
+        {
+            "module": "firewall",
+            "status": "success",
+            "error": null,
+            "duration": 0.01,
+            "findings": []
+        }
+    ]
+}
