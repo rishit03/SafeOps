@@ -1,175 +1,174 @@
 # SafeOps
 
-SafeOps is a lightweight security posture and exposure scanner designed
-for startups and small teams that need simple, practical security checks
-without enterprise complexity.
+**Find the 1--2 AWS mistakes that can get your startup hacked --- in
+under 2 minutes.**
 
-It focuses on high-signal findings, guided remediation, and easy local
-usage through a CLI.
+SafeOps is a lightweight CLI tool for backend and DevOps engineers to
+quickly detect high-risk AWS misconfigurations and fix them fast.
+
+------------------------------------------------------------------------
 
 ## Why SafeOps
 
-Many startups and small teams do not have a dedicated security function,
-and often lack the time, budget, or awareness to continuously check
-their systems for risky misconfigurations and exposure issues.
+Most startups don't have a security team.
 
-SafeOps is designed to make that problem simpler.
+Critical AWS issues like: - Public S3 buckets - Open security groups
+(0.0.0.0/0) - Public databases - Overly permissive IAM roles
 
-It provides a lightweight, CLI-based way to identify high-signal
-security issues, track how risk changes over time, and guide remediation
-without requiring enterprise security tooling.
+often go unnoticed until it's too late.
 
-## Project Goal
+SafeOps focuses only on **high-signal risks** and tells you exactly what
+to fix first.
 
-SafeOps aims to help small companies and startup environments:
+------------------------------------------------------------------------
 
--   detect meaningful security posture issues early
--   avoid alert fatigue by focusing on high-signal findings
--   fix practical misconfigurations safely
--   build better security hygiene with minimal setup
+## What it does
 
-## Quick Start
+SafeOps scans your AWS account and detects:
 
-``` bash
-git clone https://github.com/rishit03/SafeOps.git
-cd SafeOps
+-   Public S3 buckets
+-   Dangerous security group exposure
+-   Public RDS instances
+-   Risky IAM trust policies
 
-python3 -m venv venv
-source venv/bin/activate
+It then shows: - The most critical issue (Top Risk) - Why it matters -
+How to fix it - Time to fix - Priority (Fix now / Fix soon / Plan)
 
-pip install -r requirements.txt
-pip install -e .
+------------------------------------------------------------------------
 
-safeops scan
-```
-
-## One-line install (recommended)
+## Install (1 minute)
 
 ``` bash
 curl -sSL https://raw.githubusercontent.com/rishit03/SafeOps/main/install.sh | bash
 ```
 
-## Usage
+After install, SafeOps runs a setup check automatically.
 
-### Run a scan
+------------------------------------------------------------------------
 
-``` bash
-safeops scan
-```
+## Quick start
 
-### Quick health check
+### 1. Scan AWS
 
 ``` bash
-safeops check
+safeops cloud scan
 ```
 
-### Show status
+### 2. Quick status check
 
 ``` bash
-safeops status
-safeops status --summary
+safeops cloud check
 ```
 
-### Fix issues (safe mode)
+Example output:
+
+``` text
+SAFEOPS CLOUD CHECK [default]: HIGH | score=40 | findings=1 | critical=1 | high=0 | trend=Worsened
+```
+
+------------------------------------------------------------------------
+
+## Continuous monitoring
+
+Run SafeOps as a lightweight monitor:
 
 ``` bash
-safeops fix
+safeops start --cloud
 ```
 
-### Apply real fixes
+-   Runs periodically
+-   Stays quiet when nothing changes
+-   Alerts only when risk increases
+
+------------------------------------------------------------------------
+
+## Slack alerts
+
+Get notified only when something important changes:
 
 ``` bash
-safeops fix --apply
+safeops config set slack_webhook_url <url>
 ```
 
-### Run scheduler
+------------------------------------------------------------------------
+
+## Multi-profile support
+
+Scan multiple AWS environments:
 
 ``` bash
-safeops start
+safeops cloud scan --profiles dev staging prod
 ```
 
-### Rollback
+------------------------------------------------------------------------
+
+## Example output
+
+``` text
+TOP RISK
+--------
+CRITICAL
+- S3 bucket is publicly accessible: user-data
+
+Why:
+Public buckets can expose sensitive data to anyone on the internet.
+
+Impact:
+High risk of data breach and data leakage.
+
+Confidence:
+High
+
+Fix:
+1. Open AWS Console → S3 → user-data
+2. Go to Permissions tab
+3. Enable 'Block all public access'
+4. Remove public policies
+
+Time to fix: 2–5 minutes  
+Priority: Fix now
+```
+
+------------------------------------------------------------------------
+
+## Commands
 
 ``` bash
-safeops rollback <backup_path> <original_path>
+safeops cloud scan            # Full scan
+safeops cloud scan --changes  # Only new/worsened issues
+safeops cloud check           # One-line summary
+safeops start --cloud         # Continuous monitoring
+safeops doctor                # Setup check
 ```
 
-## Features
+------------------------------------------------------------------------
 
--   SSH misconfiguration detection
--   Port exposure detection (binding-aware)
--   Service detection
--   Exposure classification
--   File permission checks
--   Firewall checks
+## Who this is for
 
-## Intelligence
+-   Backend engineers
+-   DevOps engineers
+-   Startup teams without dedicated security
 
--   Finding lifecycle tracking
--   Risk scoring
--   Risk delta tracking
+------------------------------------------------------------------------
 
-## Alerts
+## What SafeOps is NOT
 
--   Slack integration
--   Alerts only for new/worsened High/Critical issues
+-   Not a full security platform
+-   Not a compliance tool
+-   Not a noisy scanner
 
-## Remediation
+SafeOps is intentionally minimal: \> **Only high-risk issues, no
+noise.**
 
--   Guided fixes
--   Dry-run by default
--   Explicit apply mode
--   Backup + rollback
-
-## Logging
-
-Logs are stored in:
-
-    ~/.safeops/safeops.log
-
-## Config
-
-Runtime config:
-
-    ~/.safeops/config.json
-
-Reference config:
-
-    sample_config.json
-
-## Known Limitations
-
--   Primarily tested on local systems
--   Limited exposure detection (no external validation)
--   No cloud checks yet
--   No centralized dashboard
+------------------------------------------------------------------------
 
 ## Roadmap
 
-See:
+Planned improvements: - Better multi-profile state tracking - Additional
+high-signal AWS checks - Improved onboarding and UX
 
-    docs/ROADMAP.md
-
-## Project Structure
-
-    safeops/
-    ├── safeops/
-    │   ├── cli/
-    │   ├── modules/
-    │   ├── engine/
-    │   ├── fixes/
-    │   ├── alerts/
-    │   ├── config/
-    │   ├── orchestrator/
-    │   ├── utils/
-    │   └── main.py
-    ├── docs/
-    ├── requirements.txt
-    ├── setup.py
-    ├── README.md
-    ├── CHANGELOG.md
-    ├── sample_config.json
+------------------------------------------------------------------------
 
 ## License
 
-MIT License
+MIT
