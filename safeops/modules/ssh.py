@@ -1,6 +1,5 @@
 import os
 import time
-
 from safeops.engine.findings import create_finding
 
 

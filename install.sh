@@ -4,7 +4,6 @@ set -e
 
 echo "Installing SafeOps..."
 
-# Clone repo
 REPO_URL="https://github.com/rishit03/SafeOps.git"
 INSTALL_DIR="$HOME/safeops"
 
@@ -16,20 +15,34 @@ fi
 
 cd "$INSTALL_DIR"
 
-# Create virtual environment
 python3 -m venv venv
-source venv/bin/activate
+. venv/bin/activate
 
-# Install dependencies
 pip install --upgrade pip
 pip install -r requirements.txt
-
-# Install CLI
 pip install -e .
 
 echo ""
-echo "SafeOps installed successfully!"
+echo "Verifying SafeOps installation..."
+
+if ! command -v safeops >/dev/null 2>&1; then
+    echo "Error: SafeOps CLI was not installed correctly."
+    exit 1
+fi
+
 echo ""
-echo "Try running:"
-echo "  safeops scan"
+echo "SafeOps installed successfully."
+echo ""
+
+echo "Running setup check..."
+safeops doctor || true
+
+echo ""
+echo "Next steps:"
+echo "1. Run: safeops cloud scan"
+echo "2. Run: safeops start --cloud"
+echo "3. Optional: safeops config set slack_webhook_url <url>"
+echo ""
+echo "If you want a quick status later, run:"
+echo "  safeops cloud check"
 echo ""

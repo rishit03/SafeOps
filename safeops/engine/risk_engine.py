@@ -88,3 +88,37 @@ def compare_risk_scores(previous_findings, current_findings):
         trend = "No Change"
 
     return prev_score, curr_score, delta, trend
+
+def get_top_risk(findings):
+    if not findings:
+        return None
+
+    severity_rank = {
+        "critical": 4,
+        "high": 3,
+        "medium": 2,
+        "low": 1
+    }
+
+    return sorted(
+        findings,
+        key=lambda f: severity_rank.get(f["severity"], 1),
+        reverse=True
+    )[0]
+
+def get_remediation_priority(severity, time_to_fix):
+    severity = severity.lower()
+
+    if (severity == "critical" and time_to_fix in ["2–5 minutes", "5–10 minutes"]) or (
+        severity == "high" and time_to_fix == "2–5 minutes"
+    ):
+        return "Fix now"
+
+    if (severity == "critical" and time_to_fix == "10–30 minutes") or (
+        severity == "high" and time_to_fix == "5–10 minutes"
+    ) or (
+        severity == "medium" and time_to_fix == "2–5 minutes"
+    ):
+        return "Fix soon"
+
+    return "Plan this"

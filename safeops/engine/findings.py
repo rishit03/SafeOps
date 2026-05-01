@@ -10,7 +10,10 @@ def create_finding(
     status=None,
     requires_elevation=False,
     why_it_matters=None,
-    impact=None
+    impact=None,
+    confidence="high",
+    time_to_fix=None,
+    remediation_priority=None
 ):
     return {
         "id": issue_id,
@@ -24,5 +27,8 @@ def create_finding(
         "status": status,
         "requires_elevation": requires_elevation,
         "why_it_matters": why_it_matters,
-        "impact": impact
+        "impact": impact,
+        "confidence": confidence,
+        "time_to_fix": time_to_fix,
+        "remediation_priority": remediation_priority
     }
