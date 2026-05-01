@@ -7,9 +7,12 @@ echo "Installing SafeOps..."
 REPO_URL="https://github.com/rishit03/SafeOps.git"
 INSTALL_DIR="$HOME/safeops"
 
-if [ -d "$INSTALL_DIR" ]; then
+if [ -d "$INSTALL_DIR/.git" ]; then
     echo "SafeOps already exists at $INSTALL_DIR"
+    echo "Updating SafeOps..."
+    git -C "$INSTALL_DIR" pull --ff-only
 else
+    rm -rf "$INSTALL_DIR"
     git clone "$REPO_URL" "$INSTALL_DIR"
 fi
 
@@ -21,6 +24,8 @@ python3 -m venv venv
 pip install --upgrade pip
 pip install -r requirements.txt
 pip install -e .
+
+hash -r 2>/dev/null || true
 
 echo ""
 echo "Verifying SafeOps installation..."
@@ -35,7 +40,7 @@ echo "SafeOps installed successfully."
 echo ""
 
 echo "Running setup check..."
-safeops doctor || true
+safeops doctor 2>/dev/null || echo "Setup check not available yet."
 
 echo ""
 echo "Next steps:"
