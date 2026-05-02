@@ -8,7 +8,8 @@ DEFAULT_CLOUD_STATE = {
     "last_scan_time": None,
     "current_findings": [],
     "previous_findings": [],
-    "resolved_findings": []
+    "resolved_findings": [],
+    "state_warning": None
 }
 
 
@@ -30,7 +31,7 @@ def ensure_cloud_state_exists(profile=None):
     state_path = get_cloud_state_path(profile)
 
     if not os.path.exists(state_path) or os.path.getsize(state_path) == 0:
-        save_cloud_state(DEFAULT_CLOUD_STATE, profile=profile)
+        save_cloud_state(DEFAULT_CLOUD_STATE.copy(), profile=profile)
 
 
 def load_cloud_state(profile=None):
@@ -42,6 +43,10 @@ def load_cloud_state(profile=None):
             state = json.load(file)
     except (json.JSONDecodeError, OSError):
         state = DEFAULT_CLOUD_STATE.copy()
+        state["state_warning"] = (
+            "Previous cloud scan state was reset because the state file was missing, corrupt, or unreadable. "
+            "Change tracking may be inaccurate until the next clean scan."
+        )
         save_cloud_state(state, profile=profile)
 
     merged_state = DEFAULT_CLOUD_STATE.copy()
@@ -53,5 +58,8 @@ def save_cloud_state(state_data, profile=None):
     ensure_safeops_home_exists()
     state_path = get_cloud_state_path(profile)
 
+    state_to_save = DEFAULT_CLOUD_STATE.copy()
+    state_to_save.update(state_data)
+
     with open(state_path, "w") as file:
-        json.dump(state_data, file, indent=4)
+        json.dump(state_to_save, file, indent=4)

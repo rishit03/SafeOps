@@ -589,11 +589,7 @@ def handle_cloud_scan(args, silent=False):
     else:
         profiles_to_scan = [None]
 
-    if len(profiles_to_scan) == 1:
-        profiles_to_scan = [profiles_to_scan[0]]
-
     is_multi_profile = len(profiles_to_scan) > 1
-
     active_state_profile = profiles_to_scan[0] if len(profiles_to_scan) == 1 else None
 
     for profile in profiles_to_scan:
@@ -602,9 +598,11 @@ def handle_cloud_scan(args, silent=False):
             if not silent:
                 print(f"Error: {auth['error']}")
             return
-    
+
     if is_multi_profile and not silent:
-        print("Note: multi-profile scan output is shown live, but state tracking is only saved for single-profile scans.\n")
+        print(
+            "Note: multi-profile scan output is shown live, but state tracking is only saved for single-profile scans.\n"
+        )
 
     raw_results = []
 
@@ -639,12 +637,15 @@ def handle_cloud_scan(args, silent=False):
         })
 
     all_findings = []
+    module_errors = []
+    scanner_warnings = []
 
     for profile_data in raw_results:
         profile_label = profile_data["profile"]
 
-        for section_data in profile_data["sections"].values():
+        for section_name, section_data in profile_data["sections"].items():
             result = section_data["result"]
+
             if result["status"] == "success":
                 for finding in result.get("findings", []):
                     enriched_finding = finding.copy()
@@ -653,146 +654,205 @@ def handle_cloud_scan(args, silent=False):
                     enriched_finding["title"] = f"[{profile_label}] {finding['title']}"
                     all_findings.append(enriched_finding)
 
-        if is_multi_profile:
-            previous_cloud_findings = []
-        else:
-            cloud_state = load_cloud_state(profile=active_state_profile)
-            previous_cloud_findings = cloud_state.get("current_findings", [])
+                for warning in result.get("warnings", []):
+                    scanner_warnings.append({
+                        "profile": profile_label,
+                        "section": section_name,
+                        "type": warning.get("type", "warning"),
+                        "message": warning.get("message", "Scanner reported a warning."),
+                        "details": warning.get("details", [])
+                    })
+            else:
+                module_errors.append({
+                    "profile": profile_label,
+                    "section": section_name,
+                    "error": result.get("error", "Unknown error")
+                })
 
-        current_cloud_findings_with_status, resolved_cloud_findings = assign_statuses(
-            all_findings,
-            previous_cloud_findings
-        )
+    state_warning = None
 
-        new_count = sum(
-            1 for f in current_cloud_findings_with_status
-            if f["status"] == "new"
-        )
+    if is_multi_profile:
+        previous_cloud_findings = []
+    else:
+        cloud_state = load_cloud_state(profile=active_state_profile)
+        previous_cloud_findings = cloud_state.get("current_findings", [])
+        state_warning = cloud_state.get("state_warning")
 
-        worsened_count = sum(
-            1 for f in current_cloud_findings_with_status
-            if f["status"] == "worsened"
-        )
+    current_cloud_findings_with_status, resolved_cloud_findings = assign_statuses(
+        all_findings,
+        previous_cloud_findings
+    )
 
-        resolved_count = len(resolved_cloud_findings)
+    new_count = sum(
+        1 for f in current_cloud_findings_with_status
+        if f["status"] == "new"
+    )
 
-        if args.changes:
-            filtered_findings = [
-                f for f in current_cloud_findings_with_status
-                if f["status"] in ["new", "worsened"]
-            ]
-        else:
-            filtered_findings = current_cloud_findings_with_status
+    worsened_count = sum(
+        1 for f in current_cloud_findings_with_status
+        if f["status"] == "worsened"
+    )
 
-        should_print = not silent or bool(filtered_findings)
+    resolved_count = len(resolved_cloud_findings)
 
-        cloud_alert_findings = [
+    if args.changes:
+        filtered_findings = [
             f for f in current_cloud_findings_with_status
-            if f["status"] in ["new", "worsened"] and f["severity"] in ["critical", "high"]
+            if f["status"] in ["new", "worsened"]
+        ]
+    else:
+        filtered_findings = current_cloud_findings_with_status
+
+    should_print = (
+        not silent
+        or bool(filtered_findings)
+        or bool(module_errors)
+        or bool(scanner_warnings)
+        or bool(state_warning)
+    )
+
+    cloud_alert_findings = [
+        f for f in current_cloud_findings_with_status
+        if f["status"] in ["new", "worsened"] and f["severity"] in ["critical", "high"]
+    ]
+
+    cloud_risk_score = calculate_risk_score(current_cloud_findings_with_status)
+    cloud_risk_label = classify_risk_score(cloud_risk_score)
+
+    prev_cloud_score, curr_cloud_score, cloud_delta, cloud_trend = compare_risk_scores(
+        previous_cloud_findings,
+        current_cloud_findings_with_status
+    )
+
+    if not is_multi_profile:
+        save_cloud_state({
+            "last_scan_time": datetime.utcnow().isoformat(),
+            "current_findings": current_cloud_findings_with_status,
+            "previous_findings": previous_cloud_findings,
+            "resolved_findings": resolved_cloud_findings
+        }, profile=active_state_profile)
+
+    config = load_config()
+    webhook_url = config.get("slack_webhook_url")
+
+    if cloud_alert_findings and webhook_url:
+        alert_critical_count = sum(
+            1 for f in cloud_alert_findings if f["severity"] == "critical"
+        )
+        alert_high_count = sum(
+            1 for f in cloud_alert_findings if f["severity"] == "high"
+        )
+
+        message_lines = [
+            "SafeOps Cloud Alert",
+            "",
+            f"Host: {get_hostname()}",
+            f"Scan Time (UTC): {datetime.utcnow().isoformat()}",
+            "",
+            "Cloud Risk Summary:",
+            f"- Critical: {alert_critical_count}",
+            f"- High: {alert_high_count}",
+            f"- Risk Score: {cloud_risk_score}/100",
+            f"- Risk Level: {cloud_risk_label}",
+            f"- Change: {cloud_delta:+} ({cloud_trend})",
+            "",
+            "New or Worsening Cloud Risks:",
+            ""
         ]
 
-        cloud_risk_score = calculate_risk_score(current_cloud_findings_with_status)
-        cloud_risk_label = classify_risk_score(cloud_risk_score)
-
-        prev_cloud_score, curr_cloud_score, cloud_delta, cloud_trend = compare_risk_scores(
-            previous_cloud_findings,
-            current_cloud_findings_with_status
-        )
-
-        if not is_multi_profile:
-            save_cloud_state({
-                "last_scan_time": datetime.utcnow().isoformat(),
-                "current_findings": current_cloud_findings_with_status,
-                "previous_findings": previous_cloud_findings,
-                "resolved_findings": resolved_cloud_findings
-            }, profile=active_state_profile)
-
-        config = load_config()
-        webhook_url = config.get("slack_webhook_url")
-
-        if cloud_alert_findings and webhook_url:
-            alert_critical_count = sum(
-                1 for f in cloud_alert_findings if f["severity"] == "critical"
-            )
-            alert_high_count = sum(
-                1 for f in cloud_alert_findings if f["severity"] == "high"
+        for finding in cloud_alert_findings:
+            message_lines.append(
+                f"[{finding['severity'].upper()}][{finding['status'].upper()}] {finding['title']}"
             )
 
-            message_lines = [
-                "SafeOps Cloud Alert",
-                "",
-                f"Host: {get_hostname()}",
-                f"Scan Time (UTC): {datetime.utcnow().isoformat()}",
-                "",
-                "Cloud Risk Summary:",
-                f"- Critical: {alert_critical_count}",
-                f"- High: {alert_high_count}",
-                f"- Risk Score: {cloud_risk_score}/100",
-                f"- Risk Level: {cloud_risk_label}",
-                f"- Change: {cloud_delta:+} ({cloud_trend})",
-                "",
-                "New or Worsening Cloud Risks:",
-                ""
-            ]
+        message_lines.append("")
+        message_lines.append("Suggested Action:")
+        message_lines.append("- Run: safeops cloud scan")
+        message_lines.append("- Review exposed AWS resources immediately")
 
-            for finding in cloud_alert_findings:
-                message_lines.append(
-                    f"[{finding['severity'].upper()}][{finding['status'].upper()}] {finding['title']}"
-                )
+        message = "\n".join(message_lines)
+        send_slack_alert(webhook_url, message)
 
-            message_lines.append("")
-            message_lines.append("Suggested Action:")
-            message_lines.append("- Run: safeops cloud scan")
-            message_lines.append("- Review exposed AWS resources immediately")
+    if args.changes and not filtered_findings and not module_errors and not scanner_warnings and not state_warning:
+        if not silent:
+            print("\n=== SafeOps Cloud Scan ===\n")
+            print("No new or worsened cloud risks detected.\n")
+        return
 
-            message = "\n".join(message_lines)
-            send_slack_alert(webhook_url, message)
+    if not should_print:
+        return
 
-        if args.changes and not filtered_findings:
-            if not silent:
-                print("\n=== SafeOps Cloud Scan ===\n")
-                print("No new or worsened cloud risks detected.\n")
-            return
+    print("\n=== SafeOps Cloud Scan ===\n")
 
-        if not should_print:
-            return
+    top_risk = get_top_risk(filtered_findings)
+    other_findings_count = max(0, len(filtered_findings) - 1)
+    has_any_findings = len(filtered_findings) > 0
 
-        print("\n=== SafeOps Cloud Scan ===\n")
+    if top_risk:
+        print("TOP RISK")
+        print("--------")
+        print(f"{top_risk['severity'].upper()}")
+        print(f"- {top_risk['title']}")
+        print(f"  Why        : {top_risk['why_it_matters']}")
+        print(f"  Impact     : {top_risk['impact']}")
+        print(f"  Confidence : {top_risk.get('confidence', 'high').capitalize()}")
+        print(f"  Fix        : {top_risk['fix']}")
+        print(f"  Time to fix: {top_risk.get('time_to_fix', 'unknown')}")
+        print(f"  Priority   : {top_risk.get('remediation_priority', 'Plan this')}")
+        print()
 
-        top_risk = get_top_risk(filtered_findings)
-        top_risk_fingerprint = top_risk["fingerprint"] if top_risk else None
+    if not args.changes and has_any_findings:
+        if other_findings_count > 0:
+            print(f"(Other findings: {other_findings_count})\n")
+    elif not args.changes and not has_any_findings:
+        if scanner_warnings or module_errors:
+            print("
+            
+            MYE09A@MYE09A
+            \n")
+        else:
+            print("No high-signal cloud risks detected (based on available checks).\n")
 
-        other_findings_count = max(0, len(filtered_findings) - 1)
+    if new_count or worsened_count or resolved_count:
+        print("Changes")
+        print("-------")
+        print(f"New findings      : {new_count}")
+        print(f"Worsened findings : {worsened_count}")
+        print(f"Resolved findings : {resolved_count}")
+        print()
 
-        has_any_findings = len(filtered_findings) > 0
+    if module_errors or scanner_warnings or state_warning:
+        print("Warnings")
+        print("--------")
 
-        if top_risk:
-            print("TOP RISK")
-            print("--------")
-            print(f"{top_risk['severity'].upper()}")
-            print(f"- {top_risk['title']}")
-            print(f"  Why        : {top_risk['why_it_matters']}")
-            print(f"  Impact     : {top_risk['impact']}")
-            print(f"  Confidence : {top_risk.get('confidence', 'high').capitalize()}")
-            print(f"  Fix        : {top_risk['fix']}")
-            print(f"  Time to fix: {top_risk.get('time_to_fix', 'unknown')}")
-            print(f"  Priority   : {top_risk.get('remediation_priority', 'Plan this')}")
+        if state_warning:
+            print("State:")
+            print(f"- {state_warning}")
             print()
 
-        if not args.changes and has_any_findings:
-            if other_findings_count > 0:
-                print(f"(Other findings: {other_findings_count})\n")
-        elif not args.changes and not has_any_findings:
-            print("No high-signal cloud risks detected.\n")
+        if module_errors:
+            print("Some checks could not be completed. Results may be incomplete.")
+            for err in module_errors:
+                print(f"- [{err['profile']}] {err['section']}: {err['error']}")
 
-        if new_count or worsened_count or resolved_count:
-            print("Changes")
-            print("-------")
-            print(f"New findings      : {new_count}")
-            print(f"Worsened findings : {worsened_count}")
-            print(f"Resolved findings : {resolved_count}")
-            print()
+        if scanner_warnings:
+            print("Coverage:")
+            for warning in scanner_warnings:
+                print(f"- [{warning['profile']}] {warning['section']}: {warning['message']}")
 
+        print()
+
+    show_full_summary = (
+        has_any_findings
+        or new_count
+        or worsened_count
+        or resolved_count
+        or bool(module_errors)
+        or bool(scanner_warnings)
+        or bool(state_warning)
+    )
+
+    if show_full_summary:
         print("Cloud Summary")
         print("-------------")
         print(f"Total Findings : {len(filtered_findings)}")

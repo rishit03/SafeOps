@@ -1,6 +1,7 @@
 import time
 
 from safeops.config.config_loader import load_config
+
 from safeops.utils.logger import log_info
 
 
@@ -11,8 +12,22 @@ def start_scheduler(cloud_mode=False, profile=None):
     interval = config.get("scan_interval_minutes", 60)
 
     mode_label = "cloud" if cloud_mode else "local"
-    profile_label = f", profile: {profile}" if profile else ""
+
+    profile_name = profile if profile else "default"
+
+    profile_label = f", profile: {profile_name}" if cloud_mode else ""
+
     print(f"SafeOps scheduler started (interval: {interval} minutes, mode: {mode_label}{profile_label})")
+
+    if cloud_mode:
+
+        print("Monitoring AWS for new high-signal risks and meaningful changes.")
+
+        print("Use 'safeops cloud check' anytime for a quick status summary.")
+
+    else:
+
+        print("Monitoring local system posture for meaningful changes.")
 
     print("Press Ctrl+C to stop.\n")
 
@@ -22,7 +37,13 @@ def start_scheduler(cloud_mode=False, profile=None):
 
             from safeops.cli.commands import handle_cloud_scan
 
-            handle_cloud_scan(type("Args", (), {"changes": True, "profile": profile})(), silent=True)
+            handle_cloud_scan(
+
+                type("Args", (), {"changes": True, "profile": profile, "profiles": None})(),
+
+                silent=True
+
+            )
 
         else:
 
@@ -40,7 +61,13 @@ def start_scheduler(cloud_mode=False, profile=None):
 
                 from safeops.cli.commands import handle_cloud_scan
 
-                handle_cloud_scan(type("Args", (), {"changes": True, "profile": profile})(), silent=True)
+                handle_cloud_scan(
+
+                    type("Args", (), {"changes": True, "profile": profile, "profiles": None})(),
+
+                    silent=True
+
+                )
 
             else:
 
