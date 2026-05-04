@@ -50,17 +50,17 @@ def scan_security_groups(profile=None):
                         )
 
                         if public_ipv4 or public_ipv6:
-                            findings.append(create_finding(
+                            finding = create_finding(
                                 issue_id="AWS_SECURITY_GROUP_PUBLIC_PORT",
                                 fingerprint=f"AWS_SECURITY_GROUP_PUBLIC_PORT:{sg_id}:{port}",
                                 title=f"{title} in security group {sg_name} ({sg_id})",
                                 severity=severity,
                                 description=f"Security group {sg_name} ({sg_id}) allows inbound access from the public internet on port {port}.",
                                 fix="""1. Go to AWS Console → EC2 → Security Groups
-                                2. Select the affected security group
-                                3. Edit inbound rules
-                                4. Remove 0.0.0.0/0 access for this port
-                                5. Restrict to your IP or internal network""",
+                            2. Select the affected security group
+                            3. Edit inbound rules
+                            4. Remove 0.0.0.0/0 access for this port
+                            5. Restrict to your IP or internal network""",
                                 auto_fix_supported=False,
                                 module="aws_security_groups",
                                 requires_elevation=False,
@@ -69,7 +69,14 @@ def scan_security_groups(profile=None):
                                 confidence="high",
                                 time_to_fix="2–5 minutes",
                                 remediation_priority="Fix now"
-                            ))
+                            )
+
+                            finding["resource_type"] = "security_group"
+                            finding["security_group_id"] = sg_id
+                            finding["security_group_name"] = sg_name
+                            finding["port"] = port
+
+                            findings.append(finding)
 
         return {
             "module": "aws_security_groups",

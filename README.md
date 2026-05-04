@@ -1,7 +1,12 @@
 # SafeOps
 
-**Find the 1--2 AWS mistakes that can get your startup hacked --- in
-under 2 minutes.**
+**Find the 1–2 AWS mistakes that can get your startup hacked — in under 2 minutes.**
+
+> Built for startup engineers who want quick, high-signal AWS security checks without the noise.
+
+⭐ If this saves you time or catches something important, consider starring the repo.
+
+---
 
 SafeOps is a lightweight CLI tool for backend and DevOps engineers to
 quickly detect high-risk AWS misconfigurations and fix them fast.
@@ -47,6 +52,15 @@ curl -sSL https://raw.githubusercontent.com/rishit03/SafeOps/main/install.sh | b
 After install, SafeOps runs a setup check automatically.
 
 ------------------------------------------------------------------------
+
+## What it feels like
+
+- Run one command
+- See what could get you hacked today
+- Fix it in minutes
+- Leave it running to catch new issues
+
+---
 
 ## Quick start
 

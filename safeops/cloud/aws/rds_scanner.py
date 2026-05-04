@@ -17,19 +17,24 @@ def scan_public_rds_instances(profile=None):
             db_id = db.get("DBInstanceIdentifier", "unknown")
             engine = db.get("Engine", "unknown")
             publicly_accessible = db.get("PubliclyAccessible", False)
+            security_group_ids = [
+                sg.get("VpcSecurityGroupId")
+                for sg in db.get("VpcSecurityGroups", [])
+                if sg.get("VpcSecurityGroupId")
+            ]
 
             if publicly_accessible:
-                findings.append(create_finding(
+                finding = create_finding(
                     issue_id="AWS_RDS_PUBLIC_INSTANCE",
                     fingerprint=f"AWS_RDS_PUBLIC_INSTANCE:{db_id}",
                     title=f"RDS instance is publicly accessible: {db_id}",
                     severity="critical",
                     description=f"RDS instance {db_id} ({engine}) is marked as publicly accessible.",
                     fix="""1. Go to AWS Console → RDS → Databases
-                    2. Select the instance
-                    3. Modify settings
-                    4. Disable 'Publicly Accessible'
-                    5. Ensure it is in a private subnet""",
+                2. Select the instance
+                3. Modify settings
+                4. Disable 'Publicly Accessible'
+                5. Ensure it is in a private subnet""",
                     auto_fix_supported=False,
                     module="aws_rds",
                     requires_elevation=False,
@@ -38,7 +43,14 @@ def scan_public_rds_instances(profile=None):
                     confidence="high",
                     time_to_fix="5–10 minutes",
                     remediation_priority="Fix soon"
-                ))
+                )
+
+                finding["resource_type"] = "rds_instance"
+                finding["db_instance_id"] = db_id
+                finding["engine"] = engine
+                finding["security_group_ids"] = security_group_ids
+
+                findings.append(finding)
 
         return {
             "module": "aws_rds",

@@ -775,7 +775,19 @@ def handle_cloud_scan(args, silent=False):
 
     if args.changes and not filtered_findings and not module_errors and not scanner_warnings and not state_warning:
         if not silent:
-            print("\n=== SafeOps Cloud Scan ===\n")
+            print("\nSAFEOPS CLOUD")
+            print("-------------")
+            print(f"Risk Level: {cloud_risk_label.capitalize()}")
+
+            # safe: use current findings instead of display_findings
+            top_risk = get_top_risk(filtered_findings)
+            if top_risk:
+                print(f"Top Risk: {top_risk['title']}")
+            else:
+                print("Top Risk: No new or worsened risks")
+
+            print()
+            print("=== SafeOps Cloud Scan ===\n")
             print("No new or worsened cloud risks detected.\n")
         return
 
@@ -784,9 +796,28 @@ def handle_cloud_scan(args, silent=False):
 
     print("\n=== SafeOps Cloud Scan ===\n")
 
-    top_risk = get_top_risk(filtered_findings)
-    other_findings_count = max(0, len(filtered_findings) - 1)
-    has_any_findings = len(filtered_findings) > 0
+    rds_security_group_ids = set()
+
+    for f in filtered_findings:
+        if f.get("resource_type") == "rds_instance":
+            for sg_id in f.get("security_group_ids", []):
+                rds_security_group_ids.add(sg_id)
+
+    display_findings = []
+
+    for f in filtered_findings:
+        is_related_rds_sg_finding = (
+            f.get("resource_type") == "security_group"
+            and f.get("port") in [3306, 5432]
+            and f.get("security_group_id") in rds_security_group_ids
+        )
+
+        if not is_related_rds_sg_finding:
+            display_findings.append(f)
+
+    top_risk = get_top_risk(display_findings)
+    other_findings_count = max(0, len(display_findings) - 1)
+    has_any_findings = len(display_findings) > 0
 
     if top_risk:
         print("TOP RISK")
@@ -796,30 +827,81 @@ def handle_cloud_scan(args, silent=False):
         print(f"  Why        : {top_risk['why_it_matters']}")
         print(f"  Impact     : {top_risk['impact']}")
         print(f"  Confidence : {top_risk.get('confidence', 'high').capitalize()}")
-        print(f"  Fix        : {top_risk['fix']}")
+        fix_lines = top_risk['fix'].split("\n")
+        print(f"  Fix        : {fix_lines[0]}")
+        for line in fix_lines[1:]:
+            print(f"  {' ' * 12}{line}")
         print(f"  Time to fix: {top_risk.get('time_to_fix', 'unknown')}")
         print(f"  Priority   : {top_risk.get('remediation_priority', 'Plan this')}")
         print()
 
+        # Fix Groups (advanced grouping)
+        fix_groups = []
+
+        rds_related = [
+            f for f in display_findings
+            if f.get("resource_type") in ["rds_instance", "security_group"]
+            and (
+                (f.get("resource_type") == "rds_instance")
+                or (f.get("port") in [3306, 5432])
+            )
+        ]
+
+        if rds_related:
+            fix_groups.append({
+                "title": "Public database exposure (RDS + network access)",
+                "items": rds_related
+            })
+
+        if fix_groups:
+            print("Fix Groups")
+            print("----------")
+            for group in fix_groups:
+                print(f"{group['title']}:")
+                for item in group["items"]:
+                    print(f"- {item['title']}")
+                print("Suggested action: Make database private and restrict security group access\n")
+
     if not args.changes and has_any_findings:
         if other_findings_count > 0:
-            print(f"(Other findings: {other_findings_count})\n")
+            print(f"(Other findings: {other_findings_count} — run 'safeops cloud scan' for details)\n")
+
     elif not args.changes and not has_any_findings:
         if scanner_warnings or module_errors:
-            print("
-            
-            MYE09A@MYE09A
-            \n")
-        else:
             print("No high-signal cloud risks detected (based on available checks).\n")
+        else:
+            print("No high-signal cloud risks detected. Your AWS setup looks good.\n")
+            print("Run 'safeops start --cloud' to keep monitoring for new risks.\n")
 
     if new_count or worsened_count or resolved_count:
         print("Changes")
         print("-------")
-        print(f"New findings      : {new_count}")
-        print(f"Worsened findings : {worsened_count}")
+        display_new_count = sum(
+            1 for f in display_findings if f["status"] == "new"
+        )
+        print(f"New findings      : {display_new_count}")
+        display_worsened_count = sum(
+            1 for f in display_findings if f["status"] == "worsened"
+        )
+        print(f"Worsened findings : {display_worsened_count}")
         print(f"Resolved findings : {resolved_count}")
         print()
+
+        if new_count > 0 or worsened_count > 0:
+            print("Changed Issues")
+            print("--------------")
+            for f in display_findings:
+                if f["status"] in ["new", "worsened"]:
+                    priority = f.get("remediation_priority", "")
+                    print(f"- [{f['severity'].upper()}][{f['status'].upper()}] {f['title']} ({priority})")
+            print()
+
+        if resolved_count > 0:
+            print("Resolved Issues")
+            print("----------------")
+            for f in resolved_cloud_findings:
+                print(f"- [{f['severity'].upper()}] {f['title']}")
+            print()
 
     if module_errors or scanner_warnings or state_warning:
         print("Warnings")
@@ -855,7 +937,8 @@ def handle_cloud_scan(args, silent=False):
     if show_full_summary:
         print("Cloud Summary")
         print("-------------")
-        print(f"Total Findings : {len(filtered_findings)}")
+        print(f"Displayed Findings : {len(display_findings)}")
+        print(f"Raw Detections     : {len(filtered_findings)}")
 
         critical_count = sum(
             1 for f in filtered_findings
@@ -874,6 +957,18 @@ def handle_cloud_scan(args, silent=False):
         print(f"Current Score  : {curr_cloud_score}/100")
         print(f"Change         : {cloud_delta:+} ({cloud_trend})")
         print()
+
+        if not silent:
+            print("SafeOps analyzed your AWS environment using high-signal checks.")
+            print("Run 'safeops start --cloud' to monitor for new risks automatically.\n")
+
+        if has_any_findings and not silent:
+            print("Next:")
+            print("- Fix the issue above")
+            print("- Re-run: safeops cloud scan (confirm fix)")
+            print("- Then run: safeops start --cloud (monitor continuously)")
+            print("- Use: safeops cloud check (quick status anytime)")
+            print()
 
 def handle_cloud_check(args):
     auth = validate_aws_setup(profile=args.profile)
@@ -924,25 +1019,51 @@ def handle_cloud_check(args):
         current_cloud_findings
     )
 
+    rds_security_group_ids = set()
+
+    for f in current_cloud_findings:
+        if f.get("resource_type") == "rds_instance":
+            for sg_id in f.get("security_group_ids", []):
+                rds_security_group_ids.add(sg_id)
+
+    display_findings = []
+
+    for f in current_cloud_findings:
+        is_related_rds_sg_finding = (
+            f.get("resource_type") == "security_group"
+            and f.get("port") in [3306, 5432]
+            and f.get("security_group_id") in rds_security_group_ids
+        )
+
+        if not is_related_rds_sg_finding:
+            display_findings.append(f)
+
     critical_count = sum(
-        1 for f in current_cloud_findings
+        1 for f in display_findings
         if f["severity"] == "critical"
     )
+
     high_count = sum(
-        1 for f in current_cloud_findings
+        1 for f in display_findings
         if f["severity"] == "high"
     )
 
-    profile_context = f" [{args.profile}]" if args.profile else " [all profiles]"
+    top_risk = get_top_risk(display_findings)
+
+    profile_context = f" [{args.profile}]" if args.profile else " [default]"
 
     print(
         f"SAFEOPS CLOUD CHECK{profile_context}: {cloud_risk_label.upper()} | "
         f"score={cloud_risk_score} | "
-        f"findings={len(current_cloud_findings)} | "
+        f"findings={len(display_findings)} | "
         f"critical={critical_count} | "
         f"high={high_count} | "
         f"trend={cloud_trend}"
     )
+
+    if top_risk:
+        priority = top_risk.get("remediation_priority", "Review")
+        print(f"Top Risk: [{top_risk['severity'].upper()}] {top_risk['title']} ({priority})")
 
     log_info(
         f"Cloud check executed: profile={args.profile}, "

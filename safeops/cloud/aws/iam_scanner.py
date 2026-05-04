@@ -32,6 +32,10 @@ def _statement_allows_public_assume_role(statement):
 
     return False
 
+def _statement_has_condition(statement):
+    condition = statement.get("Condition")
+    return bool(condition)
+
 
 def scan_publicly_assumable_roles(profile=None):
     findings = []
@@ -63,25 +67,45 @@ def scan_publicly_assumable_roles(profile=None):
 
                 for statement in statements:
                     if _statement_allows_public_assume_role(statement):
+                        has_condition = _statement_has_condition(statement)
+
+                        severity = "high" if has_condition else "critical"
+                        confidence = "medium" if has_condition else "high"
+                        priority = "Verify now" if has_condition else "Fix now"
+
+                        condition_note = (
+                            " The trust policy includes conditions, so verify whether they sufficiently restrict access."
+                            if has_condition
+                            else " No restrictive condition was found in the matching trust statement."
+                        )
+
                         findings.append(create_finding(
                             issue_id="AWS_IAM_PUBLIC_ASSUME_ROLE",
                             fingerprint=f"AWS_IAM_PUBLIC_ASSUME_ROLE:{role_name}",
-                            title=f"IAM role may be publicly assumable: {role_name}",
-                            severity="critical",
-                            description=f"IAM role {role_name} has a trust policy that may allow assumption by any AWS principal.",
+                            title=f"IAM role may be broadly assumable: {role_name}",
+                            severity=severity,
+                            description=(
+                                f"IAM role {role_name} has a trust policy that allows broad role assumption."
+                                f"{condition_note}"
+                            ),
                             fix="""1. Go to AWS Console → IAM → Roles
-                            2. Select the role
-                            3. Review Trust relationships
-                            4. Remove '*' or overly broad principals
-                            5. Restrict to specific AWS accounts or services""",
+                    2. Select the role
+                    3. Review Trust relationships
+                    4. Remove '*' or overly broad principals
+                    5. Restrict access to specific AWS accounts, services, or tightly scoped conditions""",
                             auto_fix_supported=False,
                             module="aws_iam",
                             requires_elevation=False,
-                            why_it_matters="An overly broad trust policy can let unintended principals assume a privileged role.",
-                            impact="High risk of privilege escalation and unauthorized access in the AWS account.",
-                            confidence="high",
+                            why_it_matters=(
+                                "Broad IAM trust policies can allow unintended principals to assume roles, especially when paired "
+                                "with weak or missing conditions."
+                            ),
+                            impact=(
+                                "Potential privilege escalation or unauthorized AWS access if the role grants sensitive permissions."
+                            ),
+                            confidence=confidence,
                             time_to_fix="10–30 minutes",
-                            remediation_priority="Plan this"
+                            remediation_priority=priority
                         ))
                         break
 

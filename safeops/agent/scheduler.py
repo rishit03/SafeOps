@@ -21,7 +21,7 @@ def start_scheduler(cloud_mode=False, profile=None):
 
     if cloud_mode:
 
-        print("Monitoring AWS for new high-signal risks and meaningful changes.")
+        print("Monitoring AWS continuously. You will only be notified on meaningful risk changes.")
 
         print("Use 'safeops cloud check' anytime for a quick status summary.")
 
