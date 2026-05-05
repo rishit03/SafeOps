@@ -37,12 +37,12 @@ def _statement_has_condition(statement):
     return bool(condition)
 
 
-def scan_publicly_assumable_roles(profile=None):
+def scan_publicly_assumable_roles(profile=None, role_arn=None):
     findings = []
 
     try:
         from safeops.cloud.aws.session import get_boto3_session
-        session = get_boto3_session(profile=profile)
+        session = get_boto3_session(profile=profile, role_arn=role_arn)
         iam = session.client("iam")
         paginator = iam.get_paginator("list_roles")
 

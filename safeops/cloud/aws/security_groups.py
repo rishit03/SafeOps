@@ -17,12 +17,12 @@ def _is_public_cidr(ip_range):
     return ip_range in {"0.0.0.0/0", "::/0"}
 
 
-def scan_security_groups(profile=None):
+def scan_security_groups(profile=None, role_arn=None):
     findings = []
 
     try:
         from safeops.cloud.aws.session import get_boto3_session
-        session = get_boto3_session(profile=profile)
+        session = get_boto3_session(profile=profile, role_arn=role_arn)
         ec2 = session.client("ec2")
         response = ec2.describe_security_groups()
         security_groups = response.get("SecurityGroups", [])

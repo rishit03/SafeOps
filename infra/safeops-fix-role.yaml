@@ -1,0 +1,47 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: SafeOps IAM role and policies for AWS cloud scanning and guided fixes.
+
+Resources:
+  SafeOpsFixRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: SafeOpsFixRole
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS: !Sub "arn:aws:iam::${AWS::AccountId}:root"
+            Action: "sts:AssumeRole"
+      Policies:
+        - PolicyName: SafeOpsCloudAccess
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Sid: SafeOpsReadAccess
+                Effect: Allow
+                Action:
+                  - sts:GetCallerIdentity
+                  - ec2:DescribeSecurityGroups
+                  - rds:DescribeDBInstances
+                  - iam:ListRoles
+                  - iam:GetRole
+                  - s3:ListAllMyBuckets
+                  - s3:GetBucketAcl
+                  - s3:GetBucketPublicAccessBlock
+                Resource: "*"
+
+              - Sid: SafeOpsGuidedFixAccess
+                Effect: Allow
+                Action:
+                  - ec2:RevokeSecurityGroupIngress
+                  - s3:PutBucketPublicAccessBlock
+                  - s3:PutBucketAcl
+                  - rds:ModifyDBInstance
+                  - iam:UpdateAssumeRolePolicy
+                Resource: "*"
+
+Outputs:
+  SafeOpsFixRoleArn:
+    Description: ARN of the SafeOps fix role.
+    Value: !GetAtt SafeOpsFixRole.Arn

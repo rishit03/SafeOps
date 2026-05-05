@@ -25,6 +25,9 @@ from safeops.cloud.aws.security_groups import scan_security_groups
 from safeops.cloud.aws.rds_scanner import scan_public_rds_instances
 from safeops.cloud.aws.iam_scanner import scan_publicly_assumable_roles
 from safeops.cloud.state_manager import load_cloud_state, save_cloud_state
+from safeops.fixes.s3_fix import fix_s3_public_acl
+from safeops.fixes.rds_fix import fix_rds_public_instance
+from safeops.fixes.iam_fix import fix_iam_public_assume_role
 
 SEVERITY_ORDER = ["critical", "high", "medium", "low"]
 
@@ -44,6 +47,28 @@ def group_findings_by_severity(findings):
         severity = finding.get("severity", "low").lower()
         grouped[severity].append(finding)
     return grouped
+
+def sort_for_fix_order(findings):
+    priority_rank = {
+        "Fix now": 3,
+        "Fix soon": 2,
+        "Verify now": 1,
+        "Plan this": 0
+    }
+
+    severity_rank = {
+        "critical": 3,
+        "high": 2,
+        "medium": 1,
+        "low": 0
+    }
+
+    def key(f):
+        pr = priority_rank.get(f.get("remediation_priority", ""), 0)
+        sr = severity_rank.get(f.get("severity", ""), 0)
+        return (pr, sr)
+
+    return sorted(findings, key=key, reverse=True)
 
 def handle_scan(args, silent=False):
     log_info("Scan started")
@@ -215,6 +240,268 @@ def group_findings_by_status(findings):
 
 
 def handle_fix(args):
+    if getattr(args, "all_critical", False):
+        print("\nSafeOps Fix All Critical")
+        print("------------------------")
+
+        from safeops.fixes.security_group_fix import fix_security_group_public_port
+        from safeops.fixes.s3_fix import fix_s3_public_acl
+        from safeops.fixes.rds_fix import fix_rds_public_instance
+        from safeops.fixes.iam_fix import fix_iam_public_assume_role
+
+        cloud_state = load_cloud_state(profile=getattr(args, "profile", None))
+        current_findings = cloud_state.get("current_findings", [])
+
+        critical_findings = [
+            f for f in current_findings
+            if f.get("severity") == "critical"
+        ]
+
+        if not critical_findings:
+            print("No critical issues found.\n")
+            return
+
+        print(f"Found {len(critical_findings)} critical issue(s).\n")
+
+        if not args.apply:
+            print("Dry run mode. No changes were made.\n")
+            print("Would apply:")
+
+            for finding in critical_findings:
+                issue_id = finding.get("fingerprint")
+                title = finding.get("title", "Unknown issue")
+
+                if issue_id.startswith("default:AWS_SECURITY_GROUP_PUBLIC_PORT"):
+                    print(f"- Remove public security group ingress: {title}")
+
+                elif issue_id.startswith("default:S3_PUBLIC_BUCKET"):
+                    print(f"- Block public S3 bucket access: {title}")
+
+                elif issue_id.startswith("default:AWS_RDS_PUBLIC_INSTANCE"):
+                    print(f"- Disable public RDS accessibility: {title}")
+
+                elif issue_id.startswith("default:AWS_IAM_PUBLIC_ASSUME_ROLE"):
+                    print(f"- Restrict IAM trust policy: {title}")
+
+                else:
+                    print(f"- Unsupported fix: {title}")
+
+            print("\nTo apply these fixes, run:")
+            print("  safeops fix --all-critical --apply")
+            return
+
+        confirm = input("\nThis will apply multiple AWS fixes. Continue? [y/N]: ").strip().lower()
+
+        if confirm != "y":
+            print("Fix cancelled. No changes were made.")
+            return
+
+        applied = 0
+
+        for finding in critical_findings:
+            issue_id = finding.get("fingerprint")
+
+            if issue_id.startswith("default:AWS_SECURITY_GROUP_PUBLIC_PORT"):
+                success = fix_security_group_public_port(
+                    issue_id,
+                    profile=getattr(args, "profile", None),
+                    role_arn=getattr(args, "role_arn", None)
+                )
+
+            elif issue_id.startswith("default:S3_PUBLIC_BUCKET"):
+                success = fix_s3_public_acl(
+                    issue_id,
+                    profile=getattr(args, "profile", None),
+                    role_arn=getattr(args, "role_arn", None)
+                )
+
+            elif issue_id.startswith("default:AWS_RDS_PUBLIC_INSTANCE"):
+                success = fix_rds_public_instance(
+                    issue_id,
+                    profile=getattr(args, "profile", None),
+                    role_arn=getattr(args, "role_arn", None)
+                )
+
+            elif issue_id.startswith("default:AWS_IAM_PUBLIC_ASSUME_ROLE"):
+                success = fix_iam_public_assume_role(
+                    issue_id,
+                    profile=getattr(args, "profile", None),
+                    role_arn=getattr(args, "role_arn", None)
+                )
+
+            else:
+                success = False
+
+            if success:
+                applied += 1
+
+        print(f"\nApplied {applied}/{len(critical_findings)} fixes successfully.")
+
+        print("\nSafeOps: re-running cloud scan to refresh state...\n")
+
+        class CloudScanArgs:
+            changes = False
+            profile = getattr(args, "profile", None)
+            profiles = None
+
+        handle_cloud_scan(CloudScanArgs())
+        return
+
+    if args.issue_id and args.issue_id.startswith("default:AWS_SECURITY_GROUP_PUBLIC_PORT"):
+        from safeops.fixes.security_group_fix import fix_security_group_public_port
+
+        print("\nSafeOps Fix")
+        print("-----------")
+        print(f"Issue: {args.issue_id}")
+
+        if not args.apply:
+            print("\nDry run mode. No changes were made.")
+            print("To apply this fix, run:")
+            print(f"  safeops fix {args.issue_id} --apply")
+            return
+
+        confirm = input("\nThis will modify AWS security group rules. Continue? [y/N]: ").strip().lower()
+        if confirm != "y":
+            print("Fix cancelled. No changes were made.")
+            return
+
+        success = fix_security_group_public_port(
+            args.issue_id,
+            profile=getattr(args, "profile", None),
+            role_arn=getattr(args, "role_arn", None)
+        )
+        if not success:
+            print("\nFix failed. See error above.\n")
+            return
+
+        print("\nSafeOps: re-running cloud scan to refresh state...\n")
+
+        class CloudScanArgs:
+            changes = False
+            profile = getattr(args, "profile", None)
+            profiles = None
+
+        handle_cloud_scan(CloudScanArgs())
+        return
+
+    elif args.issue_id and args.issue_id.startswith("default:S3_PUBLIC_BUCKET"):
+        print("\nSafeOps Fix")
+        print("-----------")
+        print(f"Issue: {args.issue_id}")
+
+        if not args.apply:
+            print("\nDry run mode. No changes were made.")
+            print("To apply this fix, run:")
+            print(f"  safeops fix {args.issue_id} --apply")
+            return
+
+        confirm = input("\nThis will modify S3 bucket access. Continue? [y/N]: ").strip().lower()
+        if confirm != "y":
+            print("Fix cancelled. No changes were made.")
+            return
+
+        success = fix_s3_public_acl(
+            args.issue_id,
+            profile=getattr(args, "profile", None),
+            role_arn=getattr(args, "role_arn", None)
+        )
+
+        if not success:
+            print("\nFix failed. See error above.\n")
+            return
+
+        print("\nSafeOps: re-running cloud scan to refresh state...\n")
+
+        class CloudScanArgs:
+            changes = False
+            profile = getattr(args, "profile", None)
+            profiles = None
+
+        handle_cloud_scan(CloudScanArgs())
+        return
+
+    elif args.issue_id and args.issue_id.startswith("default:AWS_RDS_PUBLIC_INSTANCE"):
+        print("\nSafeOps Fix")
+        print("-----------")
+        print(f"Issue: {args.issue_id}")
+
+        if not args.apply:
+            print("\nDry run mode. No changes were made.")
+            print("To apply this fix, run:")
+            print(f"  safeops fix {args.issue_id} --apply")
+            return
+
+        confirm = input("\nThis will modify RDS public accessibility. Continue? [y/N]: ").strip().lower()
+        if confirm != "y":
+            print("Fix cancelled. No changes were made.")
+            return
+
+        success = fix_rds_public_instance(
+            args.issue_id,
+            profile=getattr(args, "profile", None),
+            role_arn=getattr(args, "role_arn", None)
+        )
+
+        if not success:
+            print("\nFix failed. See error above.\n")
+            return
+
+        print("\nSafeOps: re-running cloud scan to refresh state...\n")
+
+        class CloudScanArgs:
+            changes = False
+            profile = getattr(args, "profile", None)
+            profiles = None
+
+        handle_cloud_scan(CloudScanArgs())
+        return
+    
+    elif args.issue_id and args.issue_id.startswith("default:AWS_IAM_PUBLIC_ASSUME_ROLE"):
+        print("\nSafeOps Fix")
+        print("-----------")
+        print(f"Issue: {args.issue_id}")
+
+        if not args.apply:
+            print("\nDry run mode. No changes were made.")
+            print("To apply this fix, run:")
+            print(f"  safeops fix {args.issue_id} --apply")
+            return
+
+        confirm = input("\nThis will modify IAM trust policy. Continue? [y/N]: ").strip().lower()
+
+        if confirm != "y":
+            print("Fix cancelled. No changes were made.")
+            return
+
+        success = fix_iam_public_assume_role(
+            args.issue_id,
+            profile=getattr(args, "profile", None),
+            role_arn=getattr(args, "role_arn", None)
+        )
+
+        if not success:
+            print("\nFix failed. See error above.\n")
+            return
+
+        print("\nSafeOps: re-running cloud scan to refresh state...\n")
+
+        class CloudScanArgs:
+            changes = False
+            profile = getattr(args, "profile", None)
+            profiles = None
+
+        handle_cloud_scan(CloudScanArgs())
+        return
+
+    elif args.issue_id and args.issue_id.startswith("default:AWS_"):
+        print("\nSafeOps Fix")
+        print("-----------")
+        print(f"Issue: {args.issue_id}")
+        print("\nAutomatic fix is not supported for this cloud issue yet.")
+        print("Use the manual fix steps from 'safeops cloud scan'.\n")
+        return
+
+    # Existing local fix path
     state = load_state()
     current_findings = state.get("current_findings", [])
 
@@ -495,6 +782,19 @@ def build_parser():
         action="store_true",
         help="Apply real fixes instead of running in dry-run mode"
     )
+    fix_parser.add_argument(
+        "--profile",
+        help="AWS profile name to use for cloud fixes"
+    )
+    fix_parser.add_argument(
+        "--all-critical",
+        action="store_true",
+        help="Fix all supported critical cloud issues"
+    )
+    fix_parser.add_argument(
+        "--role-arn",
+        help="IAM Role ARN to assume for cloud fixes"
+    )
     fix_parser.set_defaults(func=handle_fix)
 
     status_parser = subparsers.add_parser("status", help="Show current SafeOps status")
@@ -557,6 +857,10 @@ def build_parser():
         nargs="+",
         help="Multiple AWS profile names to scan"
     )
+    cloud_scan_parser.add_argument(
+        "--role-arn",
+        help="IAM Role ARN to assume for cloud operations"
+    )
     cloud_scan_parser.set_defaults(func=handle_cloud_scan)
 
     cloud_check_parser = cloud_subparsers.add_parser(
@@ -567,6 +871,10 @@ def build_parser():
         "--profile",
         help="AWS profile name to reference in output context"
     )
+    cloud_check_parser.add_argument(
+        "--role-arn",
+        help="IAM Role ARN to assume for cloud operations"
+    )
     cloud_check_parser.set_defaults(func=handle_cloud_check)
     doctor_parser = subparsers.add_parser("doctor", help="Check SafeOps setup and readiness")
     doctor_parser.set_defaults(func=handle_doctor)
@@ -575,6 +883,66 @@ def build_parser():
 
 def is_first_run(state):
     return not state.get("last_scan_time")
+
+def estimate_fix_impact(top_risk, current_score):
+    if not top_risk:
+        return None
+
+    severity = top_risk.get("severity", "low")
+
+    reduction_map = {
+        "critical": 40,
+        "high": 20,
+        "medium": 10,
+        "low": 5
+    }
+
+    reduction = reduction_map.get(severity, 10)
+    new_score = max(0, current_score - reduction)
+
+    return {
+        "reduction": reduction,
+        "new_score": new_score
+    }
+
+def estimate_full_fix_impact(findings, current_score):
+    if not findings:
+        return None
+
+    reduction_map = {
+        "critical": 40,
+        "high": 20,
+        "medium": 10,
+        "low": 5
+    }
+
+    total_reduction = 0
+    total_time_min = 0
+    total_time_max = 0
+
+    for f in findings:
+        severity = f.get("severity", "low")
+        total_reduction += reduction_map.get(severity, 10)
+
+        time_str = f.get("time_to_fix", "")
+        if "-" in time_str:
+            parts = time_str.replace("minutes", "").strip().split("-")
+            try:
+                total_time_min += int(parts[0].strip())
+                total_time_max += int(parts[1].strip())
+            except:
+                pass
+
+    total_reduction = min(total_reduction, current_score)
+
+    new_score = max(0, current_score - total_reduction)
+
+    return {
+        "reduction": total_reduction,
+        "new_score": new_score,
+        "time_min": total_time_min,
+        "time_max": total_time_max
+    }
 
 def handle_cloud_scan(args, silent=False):
     if args.profile and args.profiles:
@@ -609,10 +977,12 @@ def handle_cloud_scan(args, silent=False):
     for profile in profiles_to_scan:
         profile_label = profile if profile else "default"
 
-        s3_result = scan_s3_public_buckets(profile=profile)
-        sg_result = scan_security_groups(profile=profile)
-        rds_result = scan_public_rds_instances(profile=profile)
-        iam_result = scan_publicly_assumable_roles(profile=profile)
+        role_arn = getattr(args, "role_arn", None)
+
+        s3_result = scan_s3_public_buckets(profile=profile, role_arn=role_arn)
+        sg_result = scan_security_groups(profile=profile, role_arn=role_arn)
+        rds_result = scan_public_rds_instances(profile=profile, role_arn=role_arn)
+        iam_result = scan_publicly_assumable_roles(profile=profile, role_arn=role_arn)
 
         raw_results.append({
             "profile": profile_label,
@@ -770,6 +1140,29 @@ def handle_cloud_scan(args, silent=False):
         message_lines.append("- Run: safeops cloud scan")
         message_lines.append("- Review exposed AWS resources immediately")
 
+        message_lines.append("")
+        message_lines.append("Run these to fix immediately:")
+
+        for finding in cloud_alert_findings:
+            issue_id = finding.get("fingerprint", "")
+            title = finding.get("title", "Unknown issue")
+
+            if issue_id.startswith("default:AWS_SECURITY_GROUP_PUBLIC_PORT"):
+                message_lines.append(f"- {title}")
+                message_lines.append(f"  safeops fix {issue_id} --apply")
+
+            elif issue_id.startswith("default:S3_PUBLIC_BUCKET"):
+                message_lines.append(f"- {title}")
+                message_lines.append(f"  safeops fix {issue_id} --apply")
+
+            elif issue_id.startswith("default:AWS_RDS_PUBLIC_INSTANCE"):
+                message_lines.append(f"- {title}")
+                message_lines.append(f"  safeops fix {issue_id} --apply")
+
+            elif issue_id.startswith("default:AWS_IAM_PUBLIC_ASSUME_ROLE"):
+                message_lines.append(f"- {title}")
+                message_lines.append(f"  safeops fix {issue_id} --apply")
+
         message = "\n".join(message_lines)
         send_slack_alert(webhook_url, message)
 
@@ -794,8 +1187,6 @@ def handle_cloud_scan(args, silent=False):
     if not should_print:
         return
 
-    print("\n=== SafeOps Cloud Scan ===\n")
-
     rds_security_group_ids = set()
 
     for f in filtered_findings:
@@ -814,6 +1205,40 @@ def handle_cloud_scan(args, silent=False):
 
         if not is_related_rds_sg_finding:
             display_findings.append(f)
+            
+    # Fix Groups (advanced grouping)
+    fix_groups = []
+
+    fix_all = estimate_full_fix_impact(display_findings, cloud_risk_score)
+
+    print("\n=== SafeOps Cloud Scan ===\n")
+
+    if fix_all and display_findings:
+        print("Fix all high-signal issues")
+        print("--------------------------")
+        if fix_all["time_min"] > 0:
+            print(f"- Estimated effort: ~{fix_all['time_min']}-{fix_all['time_max']} minutes")
+        print(f"- Risk score improves by ~{fix_all['reduction']} points")
+        print(f"- New estimated risk level: {classify_risk_score(fix_all['new_score']).capitalize()} ({fix_all['new_score']}/100)")
+        print()
+    
+    if display_findings:
+        ordered = sort_for_fix_order(display_findings)
+
+        print("Fix order")
+        print("---------")
+        grouped_titles = set()
+
+        for group in fix_groups:
+            for item in group["items"]:
+                grouped_titles.add(item["title"])
+
+        filtered_order = [f for f in ordered if f["title"] not in grouped_titles]
+
+        for i, f in enumerate(filtered_order, 1):
+            priority = f.get("remediation_priority", "")
+            print(f"{i}. {f['title']} ({priority})")
+        print()
 
     top_risk = get_top_risk(display_findings)
     other_findings_count = max(0, len(display_findings) - 1)
@@ -824,6 +1249,7 @@ def handle_cloud_scan(args, silent=False):
         print("--------")
         print(f"{top_risk['severity'].upper()}")
         print(f"- {top_risk['title']}")
+        print(f"  Issue ID   : {top_risk['fingerprint']}")
         print(f"  Why        : {top_risk['why_it_matters']}")
         print(f"  Impact     : {top_risk['impact']}")
         print(f"  Confidence : {top_risk.get('confidence', 'high').capitalize()}")
@@ -833,10 +1259,14 @@ def handle_cloud_scan(args, silent=False):
             print(f"  {' ' * 12}{line}")
         print(f"  Time to fix: {top_risk.get('time_to_fix', 'unknown')}")
         print(f"  Priority   : {top_risk.get('remediation_priority', 'Plan this')}")
-        print()
 
-        # Fix Groups (advanced grouping)
-        fix_groups = []
+        impact_estimate = estimate_fix_impact(top_risk, cloud_risk_score)
+        if impact_estimate:
+            print("  Impact if fixed:")
+            print(f"  - Risk score improves by ~{impact_estimate['reduction']} points")
+            print(f"  - Estimated new risk level: {classify_risk_score(impact_estimate['new_score']).capitalize()} ({impact_estimate['new_score']}/100)")
+
+        print()
 
         rds_related = [
             f for f in display_findings
@@ -941,11 +1371,11 @@ def handle_cloud_scan(args, silent=False):
         print(f"Raw Detections     : {len(filtered_findings)}")
 
         critical_count = sum(
-            1 for f in filtered_findings
+            1 for f in display_findings
             if f["severity"] == "critical"
         )
         high_count = sum(
-            1 for f in filtered_findings
+            1 for f in display_findings
             if f["severity"] == "high"
         )
 
@@ -1042,7 +1472,6 @@ def handle_cloud_check(args):
         1 for f in display_findings
         if f["severity"] == "critical"
     )
-
     high_count = sum(
         1 for f in display_findings
         if f["severity"] == "high"

@@ -4,7 +4,7 @@ from botocore.exceptions import ClientError
 from safeops.engine.findings import create_finding
 
 
-def scan_s3_public_buckets(profile=None):
+def scan_s3_public_buckets(profile=None, role_arn=None):
     findings = []
 
     # findings.append(create_finding(
@@ -27,7 +27,7 @@ def scan_s3_public_buckets(profile=None):
 
     try:
         from safeops.cloud.aws.session import get_boto3_session
-        session = get_boto3_session(profile=profile)
+        session = get_boto3_session(profile=profile, role_arn=role_arn)
         s3 = session.client("s3")
         buckets = s3.list_buckets()["Buckets"]
 

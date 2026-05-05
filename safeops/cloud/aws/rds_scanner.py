@@ -3,12 +3,12 @@ import boto3
 from safeops.engine.findings import create_finding
 
 
-def scan_public_rds_instances(profile=None):
+def scan_public_rds_instances(profile=None, role_arn=None):
     findings = []
 
     try:
         from safeops.cloud.aws.session import get_boto3_session
-        session = get_boto3_session(profile=profile)
+        session = get_boto3_session(profile=profile, role_arn=role_arn)
         rds = session.client("rds")
         response = rds.describe_db_instances()
         db_instances = response.get("DBInstances", [])
