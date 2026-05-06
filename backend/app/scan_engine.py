@@ -1,7 +1,7 @@
-from safeops.cloud.s3_scanner import scan_s3_public_buckets
-from safeops.cloud.security_groups import scan_security_groups
-from safeops.cloud.rds_scanner import scan_public_rds_instances
-from safeops.cloud.iam_scanner import scan_publicly_assumable_roles
+from safeops.cloud.aws.s3_scanner import scan_s3_public_buckets
+from safeops.cloud.aws.security_groups import scan_security_groups
+from safeops.cloud.aws.rds_scanner import scan_public_rds_instances
+from safeops.cloud.aws.iam_scanner import scan_publicly_assumable_roles
 
 from app.database import SessionLocal
 from app.models import Scan, Finding
