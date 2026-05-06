@@ -1102,6 +1102,34 @@ def handle_cloud_scan(args, silent=False):
             "resolved_findings": resolved_cloud_findings
         }, profile=active_state_profile)
 
+    import requests
+
+    try:
+        api_url = "http://127.0.0.1:8000/api/scans"
+
+        payload = {
+            "profile": profile_label if not is_multi_profile else "multi",
+            "risk_score": cloud_risk_score,
+            "risk_level": cloud_risk_label,
+            "findings": [
+                {
+                    "fingerprint": f["fingerprint"],
+                    "title": f["title"],
+                    "severity": f["severity"],
+                    "status": f["status"],
+                    "module": f.get("module"),
+                    "remediation_priority": f.get("remediation_priority"),
+                    "raw": f
+                }
+                for f in current_cloud_findings_with_status
+            ]
+        }
+
+        requests.post(api_url, json=payload, timeout=3)
+
+    except Exception:
+        pass
+
     config = load_config()
     webhook_url = config.get("slack_webhook_url")
 
