@@ -24,16 +24,16 @@ def get_db():
 
 
 def apply_fix(issue_id: str, role_arn: str | None = None) -> bool:
-    if issue_id.startswith("default:AWS_SECURITY_GROUP_PUBLIC_PORT"):
+    if "AWS_SECURITY_GROUP_PUBLIC_PORT" in issue_id:
         return fix_security_group_public_port(issue_id, role_arn=role_arn)
 
-    if issue_id.startswith("default:S3_PUBLIC_BUCKET"):
+    if "S3_PUBLIC_BUCKET" in issue_id:
         return fix_s3_public_acl(issue_id, role_arn=role_arn)
 
-    if issue_id.startswith("default:AWS_RDS_PUBLIC_INSTANCE"):
+    if "AWS_RDS_PUBLIC_INSTANCE" in issue_id:
         return fix_rds_public_instance(issue_id, role_arn=role_arn)
 
-    if issue_id.startswith("default:AWS_IAM_PUBLIC_ASSUME_ROLE"):
+    if "AWS_IAM_PUBLIC_ASSUME_ROLE" in issue_id:
         return fix_iam_public_assume_role(issue_id, role_arn=role_arn)
 
     raise HTTPException(status_code=400, detail="Unsupported issue type")
