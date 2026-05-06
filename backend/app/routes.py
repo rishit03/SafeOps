@@ -1,16 +1,15 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
-from app.models import Scan, Finding
+from app.models import Activity, Finding, Scan
 from app.schemas import ScanIn, ScanOut
-from fastapi import HTTPException
+from app.scan_engine import run_scan_and_store
+
 from safeops.fixes.security_group_fix import fix_security_group_public_port
 from safeops.fixes.s3_fix import fix_s3_public_acl
 from safeops.fixes.rds_fix import fix_rds_public_instance
 from safeops.fixes.iam_fix import fix_iam_public_assume_role
-import os
-import subprocess
 
 
 router = APIRouter()
@@ -22,6 +21,27 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+def apply_fix(issue_id: str, role_arn: str | None = None) -> bool:
+    if issue_id.startswith("default:AWS_SECURITY_GROUP_PUBLIC_PORT"):
+        return fix_security_group_public_port(issue_id, role_arn=role_arn)
+
+    if issue_id.startswith("default:S3_PUBLIC_BUCKET"):
+        return fix_s3_public_acl(issue_id, role_arn=role_arn)
+
+    if issue_id.startswith("default:AWS_RDS_PUBLIC_INSTANCE"):
+        return fix_rds_public_instance(issue_id, role_arn=role_arn)
+
+    if issue_id.startswith("default:AWS_IAM_PUBLIC_ASSUME_ROLE"):
+        return fix_iam_public_assume_role(issue_id, role_arn=role_arn)
+
+    raise HTTPException(status_code=400, detail="Unsupported issue type")
+
+
+def log_activity(db: Session, action: str, details: str):
+    db.add(Activity(action=action, details=details))
+    db.commit()
 
 
 @router.post("/api/scans", response_model=ScanOut)
@@ -36,17 +56,18 @@ def create_scan(scan_in: ScanIn, db: Session = Depends(get_db)):
     db.flush()
 
     for finding_in in scan_in.findings:
-        finding = Finding(
-            scan_id=scan.id,
-            fingerprint=finding_in.fingerprint,
-            title=finding_in.title,
-            severity=finding_in.severity,
-            status=finding_in.status,
-            module=finding_in.module,
-            remediation_priority=finding_in.remediation_priority,
-            raw=finding_in.raw,
+        db.add(
+            Finding(
+                scan_id=scan.id,
+                fingerprint=finding_in.fingerprint,
+                title=finding_in.title,
+                severity=finding_in.severity,
+                status=finding_in.status,
+                module=finding_in.module,
+                remediation_priority=finding_in.remediation_priority,
+                raw=finding_in.raw,
+            )
         )
-        db.add(finding)
 
     db.commit()
     db.refresh(scan)
@@ -57,187 +78,114 @@ def create_scan(scan_in: ScanIn, db: Session = Depends(get_db)):
 def get_latest_scan(db: Session = Depends(get_db)):
     return db.query(Scan).order_by(Scan.created_at.desc()).first()
 
+
 @router.post("/api/fix")
-
-def fix_issue(payload: dict):
-
+def fix_issue(payload: dict, db: Session = Depends(get_db)):
     issue_id = payload.get("issue_id")
     all_critical = payload.get("all_critical", False)
     role_arn = payload.get("role_arn")
 
-    if all_critical:
-        from app.database import SessionLocal
-        from app.models import Scan, Finding
-
-        db = SessionLocal()
-
-        latest_scan = db.query(Scan).order_by(Scan.created_at.desc()).first()
-
-        if not latest_scan:
-            return {"success": False, "message": "No scan data available"}
-
-        findings = db.query(Finding).filter(Finding.scan_id == latest_scan.id).all()
-
-        applied = 0
-
-        for f in findings:
-            if f.severity not in ["critical", "high"]:
-                continue
-
-            issue_id = f.fingerprint
-
-            if issue_id.startswith("default:AWS_SECURITY_GROUP_PUBLIC_PORT"):
-                success = fix_security_group_public_port(issue_id, role_arn=role_arn)
-
-            elif issue_id.startswith("default:S3_PUBLIC_BUCKET"):
-                success = fix_s3_public_acl(issue_id, role_arn=role_arn)
-
-            elif issue_id.startswith("default:AWS_RDS_PUBLIC_INSTANCE"):
-                success = fix_rds_public_instance(issue_id, role_arn=role_arn)
-
-            elif issue_id.startswith("default:AWS_IAM_PUBLIC_ASSUME_ROLE"):
-                success = fix_iam_public_assume_role(issue_id, role_arn=role_arn)
-
-            else:
-                success = False
-
-            if success:
-                from app.models import Activity
-                from app.database import SessionLocal
-                db = SessionLocal()
-                db.add(Activity(
-                    action="fix",
-                    details=issue_id
-                ))
-                db.commit()
-                applied += 1
-
-        try:
-            env = os.environ.copy()
-            env["SAFEOPS_API_MODE"] = "true"
-
-            subprocess.run(
-                ["safeops", "cloud", "scan"],
-                check=True,
-                env=env
-            )
-        except Exception as e:
-            print("SCAN ERROR:", e)
-
-        return {
-            "success": True,
-            "message": f"Applied {applied} high-signal fixes and refreshed scan"
-        }
-
-    if not issue_id:
-
-        raise HTTPException(status_code=400, detail="issue_id required")
-
     try:
+        if all_critical:
+            latest_scan = db.query(Scan).order_by(Scan.created_at.desc()).first()
 
-        if issue_id.startswith("default:AWS_SECURITY_GROUP_PUBLIC_PORT"):
+            if not latest_scan:
+                return {"success": False, "message": "No scan data available"}
 
-            success = fix_security_group_public_port(issue_id, role_arn=role_arn)
+            findings = (
+                db.query(Finding)
+                .filter(Finding.scan_id == latest_scan.id)
+                .all()
+            )
 
-        elif issue_id.startswith("default:S3_PUBLIC_BUCKET"):
+            applied = 0
 
-            success = fix_s3_public_acl(issue_id, role_arn=role_arn)
+            for finding in findings:
+                if finding.severity not in ["critical", "high"]:
+                    continue
 
-        elif issue_id.startswith("default:AWS_RDS_PUBLIC_INSTANCE"):
+                success = apply_fix(finding.fingerprint, role_arn=role_arn)
 
-            success = fix_rds_public_instance(issue_id, role_arn=role_arn)
+                if success:
+                    db.add(Activity(action="fix", details=finding.fingerprint))
+                    applied += 1
 
-        elif issue_id.startswith("default:AWS_IAM_PUBLIC_ASSUME_ROLE"):
-
-            success = fix_iam_public_assume_role(issue_id, role_arn=role_arn)
-
-        else:
-
-            raise HTTPException(status_code=400, detail="Unsupported issue type")
-
-        if success:
-            from app.models import Activity
-            from app.database import SessionLocal
-            db = SessionLocal()
-            db.add(Activity(
-                action="fix",
-                details=issue_id
-            ))
             db.commit()
-            try:
-                env = os.environ.copy()
-                env["SAFEOPS_API_MODE"] = "true"
 
-                subprocess.run(
-                    ["safeops", "cloud", "scan"],
-                    check=True,
-                    env=env
-                )
-            except Exception as e:
-                print("SCAN ERROR:", e)
+            result = run_scan_and_store()
 
             return {
                 "success": True,
-                "message": "Fix applied and scan triggered"
+                "message": (
+                    f"Applied {applied} high-signal fixes and refreshed scan "
+                    f"({result['findings']} findings remaining)"
+                ),
+            }
+
+        if not issue_id:
+            raise HTTPException(status_code=400, detail="issue_id required")
+
+        success = apply_fix(issue_id, role_arn=role_arn)
+
+        if success:
+            db.add(Activity(action="fix", details=issue_id))
+            db.commit()
+
+            result = run_scan_and_store()
+
+            return {
+                "success": True,
+                "message": (
+                    f"Fix applied and scan refreshed "
+                    f"({result['findings']} findings remaining)"
+                ),
             }
 
         return {
             "success": False,
-            "message": "Fix failed or no change was applied."
+            "message": "Fix failed or no change was applied.",
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         print("FIX ERROR:", repr(e))
         raise HTTPException(status_code=500, detail=str(e))
-    
+
+
 @router.post("/api/scan/run")
-def run_scan():
+def run_scan(db: Session = Depends(get_db)):
     try:
-        import os
-        import subprocess
+        result = run_scan_and_store()
 
-        env = os.environ.copy()
-        env["SAFEOPS_API_MODE"] = "true"
-
-        subprocess.run(
-            ["safeops", "cloud", "scan"],
-            check=True,
-            env=env
+        log_activity(
+            db,
+            "scan",
+            f"manual scan completed ({result['findings']} findings)",
         )
-
-        from app.models import Activity
-        from app.database import SessionLocal
-        db = SessionLocal()
-        db.add(Activity(
-            action="scan",
-            details="manual scan triggered"
-        ))
-        db.commit()
 
         return {
             "success": True,
-            "message": "Scan completed successfully"
+            "message": "Scan completed successfully",
         }
 
     except Exception as e:
         print("SCAN RUN ERROR:", repr(e))
         raise HTTPException(status_code=500, detail=str(e))
-    
-@router.get("/api/activity")
-def get_activity():
-    from app.database import SessionLocal
-    from app.models import Activity
 
-    db = SessionLocal()
-    return db.query(Activity).order_by(Activity.created_at.desc()).limit(10).all()
+
+@router.get("/api/activity")
+def get_activity(db: Session = Depends(get_db)):
+    return (
+        db.query(Activity)
+        .order_by(Activity.created_at.desc())
+        .limit(10)
+        .all()
+    )
+
 
 @router.get("/api/scans/history")
-def get_scan_history():
-    from app.database import SessionLocal
-    from app.models import Scan
-
-    db = SessionLocal()
-
+def get_scan_history(db: Session = Depends(get_db)):
     scans = (
         db.query(Scan)
         .order_by(Scan.created_at.asc())
@@ -247,10 +195,10 @@ def get_scan_history():
 
     return [
         {
-            "id": s.id,
-            "risk_score": s.risk_score,
-            "risk_level": s.risk_level,
-            "created_at": s.created_at,
+            "id": scan.id,
+            "risk_score": scan.risk_score,
+            "risk_level": scan.risk_level,
+            "created_at": scan.created_at,
         }
-        for s in scans
+        for scan in scans
     ]
