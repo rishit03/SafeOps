@@ -112,6 +112,13 @@ def fix_issue(payload: dict, db: Session = Depends(get_db)):
 
             db.commit()
 
+            if applied == 0:
+                result = run_scan_and_store()
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"No supported fixes were applied. Scan refreshed ({result['findings']} findings remaining)."
+                )
+
             result = run_scan_and_store()
 
             return {
@@ -141,10 +148,10 @@ def fix_issue(payload: dict, db: Session = Depends(get_db)):
                 ),
             }
 
-        return {
-            "success": False,
-            "message": "Fix failed or no change was applied.",
-        }
+        raise HTTPException(
+            status_code=400,
+            detail="Fix failed or the issue may already be resolved. Run Scan to refresh dashboard state."
+        )
 
     except HTTPException:
         raise
