@@ -23,7 +23,15 @@ def run_scan_and_store():
             all_findings.extend(result.get("findings", []))
 
     # simple risk score
-    risk_score = len(all_findings) * 20
+    risk_score = 0
+
+    for f in all_findings:
+        severity = f.get("severity")
+        if severity == "critical":
+            risk_score += 40
+        elif severity == "high":
+            risk_score += 20
+
     risk_score = min(risk_score, 100)
 
     if risk_score >= 80:
@@ -47,12 +55,19 @@ def run_scan_and_store():
     db.flush()
 
     for f in all_findings:
+
+        fingerprint = f.get("fingerprint", "")
+        if not fingerprint.startswith("default:"):
+            fingerprint = f"default:{fingerprint}"
+        title = f.get("title", "Unknown finding")
+        if not title.startswith("[default]"):
+            title = f"[default] {title}"
         db.add(
             Finding(
                 scan_id=scan.id,
-                fingerprint=f["fingerprint"],
-                title=f["title"],
-                severity=f["severity"],
+                fingerprint=fingerprint,
+                title=title,
+                severity=f.get("severity"),
                 status="new",
                 module=f.get("module"),
                 remediation_priority=f.get("remediation_priority"),
