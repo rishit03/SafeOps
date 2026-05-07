@@ -50,3 +50,20 @@ class WorkspaceSettings(Base):
     slack_webhook_url = Column(String, nullable=True)
     scan_frequency_minutes = Column(Integer, default=60)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+class FixHistory(Base):
+    __tablename__ = "fix_history"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    issue_id = Column(String)
+    title = Column(String)
+    severity = Column(String)
+
+    status = Column(String)  # success / failed
+    message = Column(String)
+
+    before_risk_score = Column(Integer)
+    after_risk_score = Column(Integer)
+
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))

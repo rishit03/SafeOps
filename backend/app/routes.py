@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
-from app.models import Activity, Finding, Scan
+from app.models import Activity, Finding, Scan, FixHistory
 from app.schemas import ScanIn, ScanOut
 from app.scan_engine import run_scan_and_store
 
@@ -86,9 +86,10 @@ def fix_issue(payload: dict, db: Session = Depends(get_db)):
     role_arn = payload.get("role_arn")
 
     try:
-        if all_critical:
-            latest_scan = db.query(Scan).order_by(Scan.created_at.desc()).first()
+        latest_scan = db.query(Scan).order_by(Scan.created_at.desc()).first()
+        before_score = latest_scan.risk_score if latest_scan else 0
 
+        if all_critical:
             if not latest_scan:
                 return {"success": False, "message": "No scan data available"}
 
@@ -107,11 +108,38 @@ def fix_issue(payload: dict, db: Session = Depends(get_db)):
                 success = apply_fix(finding.fingerprint, role_arn=role_arn)
 
                 if success:
+                    applied += 1
                     db.add(Activity(
                         action="fix",
                         details=f"Fixed {finding.title}"
                     ))
-                    applied += 1
+
+                    result = run_scan_and_store()
+                    after_scan = db.query(Scan).order_by(Scan.created_at.desc()).first()
+                    after_score = after_scan.risk_score if after_scan else before_score
+
+                    db.add(FixHistory(
+                        issue_id=finding.fingerprint,
+                        title=finding.title,
+                        severity=finding.severity,
+                        status="success",
+                        message="Fix applied successfully",
+                        before_risk_score=before_score,
+                        after_risk_score=after_score,
+                    ))
+
+                    before_score = after_score
+
+                else:
+                    db.add(FixHistory(
+                        issue_id=finding.fingerprint,
+                        title=finding.title,
+                        severity=finding.severity,
+                        status="failed",
+                        message="Fix failed or not applied",
+                        before_risk_score=before_score,
+                        after_risk_score=before_score,
+                    ))
 
             db.commit()
 
@@ -135,27 +163,40 @@ def fix_issue(payload: dict, db: Session = Depends(get_db)):
         if not issue_id:
             raise HTTPException(status_code=400, detail="issue_id required")
 
+        matched = None
+
+        if latest_scan:
+            matched = (
+                db.query(Finding)
+                .filter(Finding.scan_id == latest_scan.id)
+                .filter(Finding.fingerprint == issue_id)
+                .first()
+            )
+
         success = apply_fix(issue_id, role_arn=role_arn)
 
         if success:
-            latest_scan = db.query(Scan).order_by(Scan.created_at.desc()).first()
-            matched = None
-
-            if latest_scan:
-                matched = (
-                    db.query(Finding)
-                    .filter(Finding.scan_id == latest_scan.id)
-                    .filter(Finding.fingerprint == issue_id)
-                    .first()
-                )
-
             db.add(Activity(
                 action="fix",
                 details=f"Fixed {matched.title if matched else issue_id}"
             ))
-            db.commit()
 
             result = run_scan_and_store()
+
+            after_scan = db.query(Scan).order_by(Scan.created_at.desc()).first()
+            after_score = after_scan.risk_score if after_scan else before_score
+
+            db.add(FixHistory(
+                issue_id=issue_id,
+                title=matched.title if matched else issue_id,
+                severity=matched.severity if matched else "unknown",
+                status="success",
+                message="Fix applied successfully",
+                before_risk_score=before_score,
+                after_risk_score=after_score,
+            ))
+
+            db.commit()
 
             return {
                 "success": True,
@@ -164,6 +205,17 @@ def fix_issue(payload: dict, db: Session = Depends(get_db)):
                     f"({result['findings']} findings remaining)"
                 ),
             }
+
+        db.add(FixHistory(
+            issue_id=issue_id,
+            title=matched.title if matched else issue_id,
+            severity=matched.severity if matched else "unknown",
+            status="failed",
+            message="Fix failed or not applied",
+            before_risk_score=before_score,
+            after_risk_score=before_score,
+        ))
+        db.commit()
 
         raise HTTPException(
             status_code=400,
@@ -313,3 +365,12 @@ def test_aws_connection(db: Session = Depends(get_db)):
             "success": False,
             "message": str(e),
         }
+    
+@router.get("/api/fix-history")
+def get_fix_history(db: Session = Depends(get_db)):
+    return (
+        db.query(FixHistory)
+        .order_by(FixHistory.created_at.desc())
+        .limit(20)
+        .all()
+    )
