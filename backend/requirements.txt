@@ -7,3 +7,4 @@ requests
 boto3
 botocore
 -e ..
+apscheduler
