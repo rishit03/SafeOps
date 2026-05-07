@@ -54,6 +54,18 @@ type ScanHistoryItem = {
   created_at: string;
 };
 
+const formatUserDateTime = (value?: string) => {
+  if (!value) return "Not available";
+
+  return new Date(value).toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
 export default function Home() {
   const [scan, setScan] = useState<Scan | null>(null);
   const [fixing, setFixing] = useState(false);
@@ -272,7 +284,7 @@ export default function Home() {
               {history.length > 0 && (
                 <div className="mt-2 text-xs text-gray-400">
                   Last scan:{" "}
-                  {new Date(history[history.length - 1].created_at).toLocaleString()}
+                  {formatUserDateTime(history[history.length - 1]?.created_at)}
                 </div>
               )}
             </div>
@@ -680,7 +692,7 @@ export default function Home() {
                       <p className="text-gray-300">{a.details}</p>
                       {a.created_at && (
                         <p className="mt-1 text-xs text-gray-600">
-                          {new Date(a.created_at).toLocaleString()}
+                          {formatUserDateTime(a.created_at)}
                         </p>
                       )}
                     </div>
@@ -710,7 +722,7 @@ export default function Home() {
                     dataKey="created_at"
                     tick={{ fill: "#9CA3AF", fontSize: 10 }}
                     tickFormatter={(v) =>
-                      new Date(v).toLocaleTimeString([], {
+                      new Date(v).toLocaleTimeString(undefined, {
                         hour: "2-digit",
                         minute: "2-digit",
                       })
