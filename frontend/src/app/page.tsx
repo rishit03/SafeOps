@@ -57,7 +57,9 @@ type ScanHistoryItem = {
 const formatUserDateTime = (value?: string) => {
   if (!value) return "Not available";
 
-  return new Date(value).toLocaleString(undefined, {
+  const utcValue = value.endsWith("Z") ? value : `${value}Z`;
+
+  return new Date(utcValue).toLocaleString(undefined, {
     year: "numeric",
     month: "short",
     day: "numeric",
@@ -722,7 +724,7 @@ export default function Home() {
                     dataKey="created_at"
                     tick={{ fill: "#9CA3AF", fontSize: 10 }}
                     tickFormatter={(v) =>
-                      new Date(v).toLocaleTimeString(undefined, {
+                      new Date(v.endsWith("Z") ? v : `${v}Z`).toLocaleTimeString(undefined, {
                         hour: "2-digit",
                         minute: "2-digit",
                       })
