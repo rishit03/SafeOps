@@ -222,7 +222,7 @@ def get_scan_history(db: Session = Depends(get_db)):
             "id": scan.id,
             "risk_score": scan.risk_score,
             "risk_level": scan.risk_level,
-            "created_at": scan.created_at,
+            "created_at": scan.created_at.isoformat(),
         }
         for scan in scans
     ]
