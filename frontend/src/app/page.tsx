@@ -131,12 +131,28 @@ export default function Home() {
   if (!scan) {
     return (
       <div className="h-screen flex items-center justify-center bg-black text-white">
-        <div className="text-center">
+        <div className="text-center max-w-md">
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-500/20 text-blue-400">
             <ShieldCheck size={24} />
           </div>
+
           <h1 className="text-3xl font-bold">SafeOps</h1>
-          <p className="text-gray-400 mt-2">Waiting for first scan...</p>
+
+          <p className="text-gray-400 mt-2">
+            No scan data yet. Run your first cloud scan to populate the dashboard.
+          </p>
+
+          <button
+            disabled={scanning}
+            onClick={runScan}
+            className={`mt-6 rounded-xl px-5 py-3 text-sm font-semibold transition ${
+              scanning
+                ? "bg-gray-700 opacity-70 cursor-not-allowed"
+                : "bg-blue-500 hover:bg-blue-600 hover:scale-105 active:scale-95"
+            }`}
+          >
+            {scanning ? "Scanning..." : "Run First Scan"}
+          </button>
         </div>
       </div>
     );
