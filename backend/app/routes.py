@@ -107,7 +107,10 @@ def fix_issue(payload: dict, db: Session = Depends(get_db)):
                 success = apply_fix(finding.fingerprint, role_arn=role_arn)
 
                 if success:
-                    db.add(Activity(action="fix", details=finding.fingerprint))
+                    db.add(Activity(
+                        action="fix",
+                        details=f"Fixed {finding.title}"
+                    ))
                     applied += 1
 
             db.commit()
@@ -135,7 +138,21 @@ def fix_issue(payload: dict, db: Session = Depends(get_db)):
         success = apply_fix(issue_id, role_arn=role_arn)
 
         if success:
-            db.add(Activity(action="fix", details=issue_id))
+            latest_scan = db.query(Scan).order_by(Scan.created_at.desc()).first()
+            matched = None
+
+            if latest_scan:
+                matched = (
+                    db.query(Finding)
+                    .filter(Finding.scan_id == latest_scan.id)
+                    .filter(Finding.fingerprint == issue_id)
+                    .first()
+                )
+
+            db.add(Activity(
+                action="fix",
+                details=f"Fixed {matched.title if matched else issue_id}"
+            ))
             db.commit()
 
             result = run_scan_and_store()

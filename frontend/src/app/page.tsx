@@ -108,7 +108,7 @@ export default function Home() {
       const data = await res.json();
 
       if (!res.ok) {
-        toast.error(data.detail || "Scan failed");
+        toast.error(data.detail || "Scan failed. Check backend logs.");
         return;
       }
 
@@ -184,7 +184,7 @@ export default function Home() {
                   className={`rounded-xl px-5 py-3 text-sm font-semibold transition ${
                     scanning
                       ? "bg-gray-700 opacity-70 cursor-not-allowed"
-                      : "bg-blue-500 hover:bg-blue-600 shadow-lg shadow-blue-500/20"
+                      : "bg-blue-500 hover:bg-blue-600 hover:scale-105 active:scale-95 shadow-lg shadow-blue-500/20"
                   }`}
                 >
                   {scanning ? "Scanning..." : "Run Scan"}
@@ -207,14 +207,19 @@ export default function Home() {
                 {scan.risk_level}
               </div>
 
-              <div className="mt-4 text-sm text-gray-500">
+              <div className="mt-4 text-sm text-gray-400">
                 {scan.findings.length} active finding
                 {scan.findings.length === 1 ? "" : "s"}
               </div>
+              {history.length > 0 && (
+                <div className="mt-2 text-xs text-gray-400">
+                  Last scan:{" "}
+                  {new Date(history[history.length - 1].created_at).toLocaleString()}
+                </div>
+              )}
             </div>
           </div>
         </div>
-      
 
         {/* Metrics */}
         <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-3">
@@ -291,7 +296,7 @@ export default function Home() {
               className={`rounded-xl px-5 py-3 text-sm font-semibold transition ${
                 fixing
                   ? "bg-gray-700 opacity-70 cursor-not-allowed"
-                  : "bg-blue-500 hover:bg-blue-600 shadow-lg shadow-blue-500/20"
+                  : "bg-blue-500 hover:bg-blue-600 hover:scale-105 active:scale-95 shadow-lg shadow-blue-500/20"
               }`}
               onClick={async () => {
                 const confirmFix = confirm(
@@ -357,7 +362,13 @@ export default function Home() {
                 <p className="text-lg font-semibold">{scan.findings[0].title}</p>
 
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <span className="rounded-full bg-red-500/10 px-3 py-1 text-xs font-semibold text-red-300">
+                  <span
+                    className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                      scan.findings[0].severity === "critical"
+                        ? "bg-red-500/20 text-red-300"
+                        : "bg-orange-500/20 text-orange-300"
+                    }`}
+                  >
                     {scan.findings[0].severity.toUpperCase()}
                   </span>
 
@@ -386,7 +397,11 @@ export default function Home() {
                     const data = await res.json();
 
                     if (!res.ok) {
-                      toast.error(data.detail || "Fix failed");
+                      toast.error(
+                        data.detail?.includes("already")
+                          ? "Issue already resolved. Refreshing state."
+                          : data.detail || "Action failed"
+                      );
                       setFixing(false);
                       return;
                     }
@@ -405,7 +420,7 @@ export default function Home() {
                 className={`rounded-xl px-5 py-3 text-sm font-semibold transition ${
                   fixing
                     ? "bg-gray-700 opacity-70 cursor-not-allowed"
-                    : "bg-red-500 hover:bg-red-600 shadow-lg shadow-red-500/20"
+                    : "bg-red-500 hover:bg-red-600 hover:scale-105 active:scale-95 shadow-lg shadow-red-500/20"
                 }`}
               >
                 {fixing ? "Fixing..." : "Fix Now"}
@@ -462,9 +477,17 @@ export default function Home() {
                     <div className="flex items-start justify-between gap-4">
                       <div>
                         <p className="font-medium">{f.title}</p>
-                        <p className="mt-1 text-sm text-gray-500">
+                        <span
+                          className={`mt-2 inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
+                            f.severity === "critical"
+                              ? "bg-red-500/20 text-red-400"
+                              : f.severity === "high"
+                              ? "bg-orange-500/20 text-orange-400"
+                              : "bg-gray-700 text-gray-300"
+                          }`}
+                        >
                           {f.severity.toUpperCase()}
-                        </p>
+                        </span>
                       </div>
 
                       <span className="rounded-full bg-gray-800 px-3 py-1 text-xs text-gray-300">
