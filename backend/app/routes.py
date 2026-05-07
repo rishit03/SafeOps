@@ -226,3 +226,90 @@ def get_scan_history(db: Session = Depends(get_db)):
         }
         for scan in scans
     ]
+
+@router.get("/api/settings")
+def get_settings(db: Session = Depends(get_db)):
+    from app.models import WorkspaceSettings
+
+    settings = db.query(WorkspaceSettings).first()
+
+    if not settings:
+        settings = WorkspaceSettings()
+        db.add(settings)
+        db.commit()
+        db.refresh(settings)
+
+    return settings
+
+
+@router.post("/api/settings")
+def update_settings(payload: dict, db: Session = Depends(get_db)):
+    from app.models import WorkspaceSettings
+
+    settings = db.query(WorkspaceSettings).first()
+
+    if not settings:
+        settings = WorkspaceSettings()
+        db.add(settings)
+        db.flush()
+
+    settings.aws_region = payload.get("aws_region", settings.aws_region)
+    settings.role_arn = payload.get("role_arn", settings.role_arn)
+    settings.slack_webhook_url = payload.get(
+        "slack_webhook_url",
+        settings.slack_webhook_url,
+    )
+    settings.scan_frequency_minutes = payload.get(
+        "scan_frequency_minutes",
+        settings.scan_frequency_minutes,
+    )
+
+    db.commit()
+    db.refresh(settings)
+
+    return {
+        "success": True,
+        "message": "Settings updated",
+        "settings": settings,
+    }
+
+@router.post("/api/settings/test-aws")
+def test_aws_connection(db: Session = Depends(get_db)):
+    import boto3
+    from app.models import WorkspaceSettings
+
+    settings = db.query(WorkspaceSettings).first()
+
+    try:
+        session = boto3.Session(region_name=settings.aws_region if settings else "us-east-1")
+
+        if settings and settings.role_arn:
+            sts = session.client("sts")
+            assumed = sts.assume_role(
+                RoleArn=settings.role_arn,
+                RoleSessionName="safeops-test-session",
+            )
+
+            creds = assumed["Credentials"]
+
+            session = boto3.Session(
+                aws_access_key_id=creds["AccessKeyId"],
+                aws_secret_access_key=creds["SecretAccessKey"],
+                aws_session_token=creds["SessionToken"],
+                region_name=settings.aws_region,
+            )
+
+        identity = session.client("sts").get_caller_identity()
+
+        return {
+            "success": True,
+            "message": "AWS connection successful",
+            "account_id": identity.get("Account"),
+            "arn": identity.get("Arn"),
+        }
+
+    except Exception as e:
+        return {
+            "success": False,
+            "message": str(e),
+        }

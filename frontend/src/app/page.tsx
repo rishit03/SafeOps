@@ -60,6 +60,7 @@ export default function Home() {
   const [scanning, setScanning] = useState(false);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [history, setHistory] = useState<ScanHistoryItem[]>([]);
+  const [settings, setSettings] = useState<any>(null);
 
   const fetchScan = async () => {
     try {
@@ -91,10 +92,17 @@ export default function Home() {
     }
   };
 
+  const fetchSettings = async () => {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/settings`);
+    const data = await res.json();
+    setSettings(data);
+  };
+
   const refreshDashboard = async () => {
     await fetchScan();
     await fetchActivity();
     await fetchHistory();
+    await fetchSettings();
   };
 
   useEffect(() => {
@@ -269,6 +277,77 @@ export default function Home() {
               )}
             </div>
           </div>
+        </div>
+
+        <div className="bg-gray-900 p-6 rounded-xl">
+          <h2 className="text-xl font-semibold mb-4">Settings</h2>
+
+          {!settings ? (
+            <p className="text-gray-500">Loading settings...</p>
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm text-gray-400">AWS Region</label>
+                <input
+                  value={settings.aws_region || ""}
+                  onChange={(e) =>
+                    setSettings({ ...settings, aws_region: e.target.value })
+                  }
+                  className="w-full mt-1 p-2 rounded bg-black border border-gray-700"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm text-gray-400">Role ARN (optional)</label>
+                <input
+                  value={settings.role_arn || ""}
+                  onChange={(e) =>
+                    setSettings({ ...settings, role_arn: e.target.value })
+                  }
+                  className="w-full mt-1 p-2 rounded bg-black border border-gray-700"
+                />
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={async () => {
+                    const res = await fetch(
+                      `${process.env.NEXT_PUBLIC_API_URL}/api/settings`,
+                      {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(settings),
+                      }
+                    );
+                    const data = await res.json();
+                    toast.success(data.message);
+                  }}
+                  className="bg-blue-500 px-4 py-2 rounded"
+                >
+                  Save
+                </button>
+
+                <button
+                  onClick={async () => {
+                    const res = await fetch(
+                      `${process.env.NEXT_PUBLIC_API_URL}/api/settings/test-aws`,
+                      { method: "POST" }
+                    );
+                    const data = await res.json();
+
+                    if (data.success) {
+                      toast.success(`Connected: ${data.account_id}`);
+                    } else {
+                      toast.error(data.message);
+                    }
+                  }}
+                  className="bg-green-500 px-4 py-2 rounded"
+                >
+                  Test Connection
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Metrics */}

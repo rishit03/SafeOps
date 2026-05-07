@@ -40,3 +40,13 @@ class Activity(Base):
     action = Column(String)
     details = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+class WorkspaceSettings(Base):
+    __tablename__ = "workspace_settings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    aws_region = Column(String, default="us-east-1")
+    role_arn = Column(String, nullable=True)
+    slack_webhook_url = Column(String, nullable=True)
+    scan_frequency_minutes = Column(Integer, default=60)
+    created_at = Column(DateTime, default=datetime.utcnow)
