@@ -26,6 +26,10 @@ type Finding = {
   title: string;
   severity: string;
   remediation_priority?: string;
+  raw?: {
+    why_it_matters?: string;
+    [key: string]: any;
+  };
 };
 
 type Scan = {
@@ -154,7 +158,37 @@ export default function Home() {
       transition={{ duration: 0.35 }}
       className="min-h-screen bg-black text-white"
     >
-      <div className="mx-auto max-w-7xl px-8 py-10">
+      {/* SCAN OVERLAY */}
+      {scanning && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.92 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            className="rounded-2xl border border-blue-500/30 bg-gray-950 p-8 shadow-2xl shadow-blue-500/20"
+          >
+            <div className="mx-auto mb-5 h-12 w-12 animate-spin rounded-full border-4 border-blue-500/20 border-t-blue-400" />
+
+            <h2 className="text-center text-xl font-semibold">
+              Scanning your AWS account
+            </h2>
+
+            <p className="mt-2 text-center text-sm text-gray-400">
+              Checking S3, security groups, RDS, and IAM risks...
+            </p>
+          </motion.div>
+        </div>
+      )}
+
+      {/* MAIN CONTENT */}
+      <div className="mx-auto max-w-7xl px-8 py-12 space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold">SafeOps Dashboard</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            Real-time AWS security posture and automated remediation
+          </p>
+        </div>
+
         {/* Hero / SaaS landing header */}
         <div className="relative mb-10 overflow-hidden rounded-3xl border border-gray-800 bg-gradient-to-br from-gray-950 via-gray-900 to-black p-8">
           <div className="absolute right-0 top-0 h-64 w-64 rounded-full bg-blue-500/10 blur-3xl" />
@@ -307,20 +341,27 @@ export default function Home() {
                 setFixing(true);
 
                 try {
-                  const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/fix`, {
-                    method: "POST",
-                    headers: {
-                      "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({
-                      all_critical: true,
-                    }),
-                  });
+                  const res = await fetch(
+                    `${process.env.NEXT_PUBLIC_API_URL}/api/fix`,
+                    {
+                      method: "POST",
+                      headers: {
+                        "Content-Type": "application/json",
+                      },
+                      body: JSON.stringify({
+                        all_critical: true,
+                      }),
+                    }
+                  );
 
                   const data = await res.json();
 
                   if (!res.ok) {
-                    toast.error(data.detail || "Fix All failed");
+                    toast.error(
+                      data.detail?.includes("already")
+                        ? "Issue already resolved. Refreshing state."
+                        : data.detail || "Action failed"
+                    );
                     setFixing(false);
                     return;
                   }
@@ -359,14 +400,23 @@ export default function Home() {
                   <h2 className="text-xl font-semibold">Top Risk</h2>
                 </div>
 
-                <p className="text-lg font-semibold">{scan.findings[0].title}</p>
+                <p className="text-lg font-semibold">
+                  {scan.findings[0].title}
+                </p>
+
+                <p className="mt-2 max-w-xl text-sm text-gray-400">
+                  {scan.findings[0].raw?.why_it_matters ??
+                    "This misconfiguration may expose your infrastructure to attackers."}
+                </p>
 
                 <div className="mt-3 flex flex-wrap gap-2">
                   <span
                     className={`rounded-full px-3 py-1 text-xs font-semibold ${
                       scan.findings[0].severity === "critical"
                         ? "bg-red-500/20 text-red-300"
-                        : "bg-orange-500/20 text-orange-300"
+                        : scan.findings[0].severity === "high"
+                        ? "bg-orange-500/20 text-orange-300"
+                        : "bg-gray-700 text-gray-300"
                     }`}
                   >
                     {scan.findings[0].severity.toUpperCase()}
@@ -384,15 +434,18 @@ export default function Home() {
                   setFixing(true);
 
                   try {
-                    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/fix`, {
-                      method: "POST",
-                      headers: {
-                        "Content-Type": "application/json",
-                      },
-                      body: JSON.stringify({
-                        issue_id: scan.findings[0].fingerprint,
-                      }),
-                    });
+                    const res = await fetch(
+                      `${process.env.NEXT_PUBLIC_API_URL}/api/fix`,
+                      {
+                        method: "POST",
+                        headers: {
+                          "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({
+                          issue_id: scan.findings[0].fingerprint,
+                        }),
+                      }
+                    );
 
                     const data = await res.json();
 
@@ -443,11 +496,14 @@ export default function Home() {
               <div className="flex items-start gap-3 rounded-xl border border-green-500/20 bg-green-500/10 p-4">
                 <CheckCircle2 className="mt-1 text-green-400" size={22} />
                 <div>
-                  <p className="text-lg font-medium text-green-400">
+                  <p className="text-green-400 text-lg font-medium">
                     Your cloud is secure
                   </p>
                   <p className="mt-1 text-sm text-gray-400">
                     No high-risk issues detected in the latest scan.
+                  </p>
+                  <p className="mt-2 text-xs text-gray-500">
+                    Run periodic scans to ensure continuous protection.
                   </p>
                 </div>
               </div>
@@ -524,9 +580,9 @@ export default function Home() {
                     <span className="mt-1 h-2 w-2 rounded-full bg-blue-400 shadow-lg shadow-blue-400/40" />
                     <div>
                       <p className="font-medium text-white">
-                        {a.action.toUpperCase()}
+                        <span className="capitalize">{a.action}</span>
                       </p>
-                      <p className="mt-1">{a.details}</p>
+                      <p className="text-gray-300">{a.details}</p>
                       {a.created_at && (
                         <p className="mt-1 text-xs text-gray-600">
                           {new Date(a.created_at).toLocaleString()}
