@@ -5,6 +5,7 @@ from safeops.cloud.aws.iam_scanner import scan_publicly_assumable_roles
 
 from app.database import SessionLocal
 from app.models import Scan, Finding
+from safeops.alerts.slack import send_slack_alert
 
 
 def run_scan_and_store():
@@ -21,6 +22,21 @@ def run_scan_and_store():
     for result in [s3, sg, rds, iam]:
         if result["status"] == "success":
             all_findings.extend(result.get("findings", []))
+    
+    from app.database import SessionLocal
+    from app.models import WorkspaceSettings
+
+    db = SessionLocal()
+    settings = db.query(WorkspaceSettings).first()
+
+    if settings and settings.slack_webhook_url:
+        critical_findings = [f for f in all_findings if f.get("severity") == "critical"]
+
+        if critical_findings:
+            send_slack_alert(
+                settings.slack_webhook_url,
+                f"🚨 SafeOps Alert: {len(critical_findings)} critical issues detected in AWS"
+            )
 
     # simple risk score
     risk_score = 0
