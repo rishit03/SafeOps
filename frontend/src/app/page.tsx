@@ -54,6 +54,18 @@ type ScanHistoryItem = {
   created_at: string;
 };
 
+type FixHistoryItem = {
+  id: number;
+  issue_id: string;
+  title: string;
+  severity: string;
+  status: string;
+  message: string;
+  before_risk_score: number;
+  after_risk_score: number;
+  created_at?: string;
+};
+
 const formatUserDateTime = (value?: string) => {
   if (!value) return "Not available";
 
@@ -75,6 +87,8 @@ export default function Home() {
   const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [history, setHistory] = useState<ScanHistoryItem[]>([]);
   const [settings, setSettings] = useState<any>(null);
+  const [fixHistory, setFixHistory] = useState<FixHistoryItem[]>([]);
+  const [saving, setSaving] = useState(false);
 
   const fetchScan = async () => {
     try {
@@ -106,6 +120,16 @@ export default function Home() {
     }
   };
 
+  const fetchFixHistory = async () => {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/fix-history`);
+      const data = await res.json();
+      setFixHistory(data);
+    } catch {
+      setFixHistory([]);
+    }
+  };
+
   const fetchSettings = async () => {
     const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/settings`);
     const data = await res.json();
@@ -117,6 +141,7 @@ export default function Home() {
     await fetchActivity();
     await fetchHistory();
     await fetchSettings();
+    await fetchFixHistory();
   };
 
   useEffect(() => {
@@ -303,7 +328,7 @@ export default function Home() {
               <div>
                 <label className="text-sm text-gray-400">AWS Region</label>
                 <input
-                  value={settings.aws_region || ""}
+                  value={settings?.aws_region || ""}
                   onChange={(e) =>
                     setSettings({ ...settings, aws_region: e.target.value })
                   }
@@ -314,7 +339,7 @@ export default function Home() {
               <div>
                 <label className="text-sm text-gray-400">Role ARN (optional)</label>
                 <input
-                  value={settings.role_arn || ""}
+                  value={settings?.role_arn || ""}
                   onChange={(e) =>
                     setSettings({ ...settings, role_arn: e.target.value })
                   }
@@ -322,23 +347,52 @@ export default function Home() {
                 />
               </div>
 
+              <div>
+                <label className="text-sm text-gray-400">Slack Webhook URL</label>
+                <input
+                  value={settings?.slack_webhook_url || ""}
+                  onChange={(e) =>
+                    setSettings({ ...settings, slack_webhook_url: e.target.value })
+                  }
+                  className="w-full mt-1 p-2 rounded bg-black border border-gray-700"
+                />
+              </div>
+
               <div className="flex gap-3">
                 <button
+                  disabled={saving}
                   onClick={async () => {
-                    const res = await fetch(
-                      `${process.env.NEXT_PUBLIC_API_URL}/api/settings`,
-                      {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify(settings),
+                    setSaving(true);
+
+                    try {
+                      const res = await fetch(
+                        `${process.env.NEXT_PUBLIC_API_URL}/api/settings`,
+                        {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify(settings),
+                        }
+                      );
+
+                      const data = await res.json();
+
+                      if (!res.ok) {
+                        toast.error(data.detail || "Failed to update settings");
+                        return;
                       }
-                    );
-                    const data = await res.json();
-                    toast.success(data.message);
+
+                      toast.success(data.message || "Settings saved");
+                    } catch {
+                      toast.error("Settings update failed");
+                    } finally {
+                      setSaving(false);
+                    }
                   }}
-                  className="bg-blue-500 px-4 py-2 rounded"
+                  className={`px-4 py-2 rounded ${
+                    saving ? "bg-gray-700" : "bg-blue-500 hover:bg-blue-600"
+                  }`}
                 >
-                  Save
+                  {saving ? "Saving..." : "Save"}
                 </button>
 
                 <button
@@ -704,6 +758,54 @@ export default function Home() {
             )}
           </motion.div>
         </div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.55 }}
+          className="rounded-2xl border border-gray-800 bg-gray-950 p-6 shadow-xl"
+        >
+          <h2 className="mb-4 text-xl font-semibold">Fix History</h2>
+
+          {fixHistory.length === 0 ? (
+            <p className="text-gray-500">No fixes recorded yet</p>
+          ) : (
+            <ul className="space-y-4">
+              {fixHistory.map((fix) => (
+                <li
+                  key={fix.id}
+                  className="rounded-xl border border-gray-800 bg-black/30 p-4"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="font-medium">{fix.title}</p>
+                      <p className="mt-1 text-sm text-gray-500">{fix.message}</p>
+                      {fix.created_at && (
+                        <p className="mt-1 text-xs text-gray-600">
+                          {formatUserDateTime(fix.created_at)}
+                        </p>
+                      )}
+                    </div>
+
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                        fix.status === "success"
+                          ? "bg-green-500/20 text-green-400"
+                          : "bg-red-500/20 text-red-400"
+                      }`}
+                    >
+                      {fix.status.toUpperCase()}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 text-sm text-gray-400">
+                    Risk: {fix.before_risk_score}/100 → {fix.after_risk_score}/100
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </motion.div>
 
         {/* Risk Trend */}
         <motion.div

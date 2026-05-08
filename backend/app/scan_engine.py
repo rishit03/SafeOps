@@ -2,6 +2,7 @@ from safeops.cloud.aws.s3_scanner import scan_s3_public_buckets
 from safeops.cloud.aws.security_groups import scan_security_groups
 from safeops.cloud.aws.rds_scanner import scan_public_rds_instances
 from safeops.cloud.aws.iam_scanner import scan_publicly_assumable_roles
+import os
 
 from app.database import SessionLocal
 from app.models import Scan, Finding
@@ -27,7 +28,12 @@ def run_scan_and_store():
     from app.models import WorkspaceSettings
 
     db = SessionLocal()
+
     settings = db.query(WorkspaceSettings).first()
+    webhook_url = settings.slack_webhook_url if settings else None
+
+    if not webhook_url:
+        webhook_url = os.getenv("SLACK_WEBHOOK_URL")
 
     if settings and settings.slack_webhook_url:
         critical_findings = [f for f in all_findings if f.get("severity") == "critical"]
