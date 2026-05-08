@@ -164,6 +164,9 @@ export default function Home() {
       }
 
       toast.success(data.message || "Scan completed");
+      if (!settings?.slack_webhook_url) {
+        toast("Add Slack webhook to receive alerts");
+      }
 
       setTimeout(() => {
         refreshDashboard();
@@ -357,6 +360,16 @@ export default function Home() {
                   className="w-full mt-1 p-2 rounded bg-black border border-gray-700"
                 />
               </div>
+
+              {settings?.slack_webhook_url ? (
+                <p className="text-green-400 text-sm mt-1">
+                  Slack alerts enabled
+                </p>
+              ) : (
+                <p className="text-yellow-400 text-sm mt-1">
+                  No Slack webhook configured
+                </p>
+              )}
 
               <div className="flex gap-3">
                 <button
