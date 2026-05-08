@@ -217,6 +217,9 @@ export default function Home() {
       ? "text-yellow-400"
       : "text-green-400";
 
+  const isValidSlackWebhook = (url?: string) =>
+    !!url && url.startsWith("https://hooks.slack.com/services/");
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -357,13 +360,18 @@ export default function Home() {
                   onChange={(e) =>
                     setSettings({ ...settings, slack_webhook_url: e.target.value })
                   }
+                  placeholder="https://hooks.slack.com/services/..."
                   className="w-full mt-1 p-2 rounded bg-black border border-gray-700"
                 />
               </div>
 
-              {settings?.slack_webhook_url ? (
+              {isValidSlackWebhook(settings?.slack_webhook_url) ? (
                 <p className="text-green-400 text-sm mt-1">
                   Slack alerts enabled
+                </p>
+              ) : settings?.slack_webhook_url ? (
+                <p className="text-red-400 text-sm mt-1">
+                  Invalid Slack webhook URL
                 </p>
               ) : (
                 <p className="text-yellow-400 text-sm mt-1">
