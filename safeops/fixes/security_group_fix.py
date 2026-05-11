@@ -41,6 +41,7 @@ def fix_security_group_public_port(issue_id, profile=None, role_arn=None):
                         "FromPort": port,
                         "ToPort": port,
                         "IpRanges": [{"CidrIp": "0.0.0.0/0"}],
+                        "Ipv6Ranges": [{"CidrIpv6": "::/0"}]
                     }
                 ],
             )
