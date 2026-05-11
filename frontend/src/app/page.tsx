@@ -939,6 +939,10 @@ type Finding = {
     why_it_matters?: string;
     resource?: string;
     service?: string;
+    fix_priority?: string;
+    can_auto_fix?: boolean;
+    fix_reason?: string;
+    recommended_action?: string;
     [key: string]: unknown;
   };
 };
@@ -1052,6 +1056,26 @@ const severityTone = (severity?: string) => {
     return "border-amber-300/30 bg-amber-500/10 text-amber-100";
   }
   return "border-slate-500/30 bg-slate-500/10 text-slate-200";
+};
+
+const fixPriorityLabel = (priority?: string) => {
+  if (priority === "auto_fix_now") return "Auto-fix available";
+  if (priority === "review_before_fix") return "Review before fix";
+  if (priority === "manual_only") return "Manual only";
+  if (priority === "unsupported") return "Unsupported";
+  return "Review";
+};
+
+const fixPriorityTone = (priority?: string) => {
+  if (priority === "auto_fix_now") return "border-emerald-300/30 bg-emerald-400/10 text-emerald-200";
+  if (priority === "review_before_fix") return "border-amber-300/30 bg-amber-400/10 text-amber-100";
+  if (priority === "manual_only") return "border-slate-300/20 bg-slate-400/10 text-slate-200";
+  if (priority === "unsupported") return "border-red-300/30 bg-red-400/10 text-red-200";
+  return "border-white/10 bg-white/5 text-slate-300";
+};
+
+const canShowFixButton = (finding: Finding) => {
+  return finding.raw?.can_auto_fix === true;
 };
 
 const isValidSlackWebhook = (url?: string) =>
@@ -1601,7 +1625,9 @@ export default function Home() {
                     <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 font-mono text-xs text-slate-400">{topRisk.fingerprint}</span>
                   </div>
                 </div>
-                <button disabled={!!fixingIssueId} onClick={() => applyFix(topRisk)} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-red-300 px-5 py-3 text-sm font-semibold text-red-950 transition hover:bg-red-200 disabled:cursor-not-allowed disabled:opacity-60">
+                <button
+                  disabled={!!fixingIssueId || !canShowFixButton(topRisk)}
+                  onClick={() => applyFix(topRisk)} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-red-300 px-5 py-3 text-sm font-semibold text-red-950 transition hover:bg-red-200 disabled:cursor-not-allowed disabled:opacity-60">
                   {fixingIssueId === topRisk.fingerprint ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />} Fix top risk
                 </button>
               </div>
@@ -1638,13 +1664,28 @@ export default function Home() {
                             <div className="flex flex-wrap items-center gap-2">
                               <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${severityTone(finding.severity)}`}>{finding.severity.toUpperCase()}</span>
                               <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-slate-300">{finding.remediation_priority || "Review"}</span>
+                              <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${fixPriorityTone(finding.raw?.fix_priority)}`}>
+                                {fixPriorityLabel(finding.raw?.fix_priority)}
+                              </span>
                             </div>
                             <h3 className="mt-3 text-base font-semibold text-white">{finding.title}</h3>
                             <p className="mt-2 text-sm leading-6 text-slate-400">{finding.raw?.why_it_matters || "Review the resource configuration and apply the supported remediation if this exposure is unintended."}</p>
+                            {finding.raw?.fix_reason ? (
+                              <p className="mt-2 text-sm leading-6 text-slate-500">
+                                Fix guidance: {finding.raw.fix_reason}
+                              </p>
+                            ) : null}
                             <p className="mt-3 truncate font-mono text-xs text-slate-500">Issue fingerprint: {finding.fingerprint}</p>
                           </div>
-                          <button disabled={!!fixingIssueId} onClick={() => applyFix(finding)} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm font-semibold text-slate-100 transition hover:border-cyan-300/30 hover:bg-cyan-300/10 disabled:cursor-not-allowed disabled:opacity-60">
-                            {isFixing ? <Loader2 className="h-4 w-4 animate-spin" /> : <LockKeyhole className="h-4 w-4" />} Fix
+                          <button
+                            disabled={!!fixingIssueId || !canShowFixButton(finding)}
+                            onClick={() => applyFix(finding)} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-2.5 text-sm font-semibold text-slate-100 transition hover:border-cyan-300/30 hover:bg-cyan-300/10 disabled:cursor-not-allowed disabled:opacity-60">
+                            {isFixing ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <LockKeyhole className="h-4 w-4" />
+                            )}
+                            {canShowFixButton(topRisk) ? "Fix top risk" : "Review required"}
                           </button>
                         </div>
                       </motion.article>

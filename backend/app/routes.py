@@ -200,7 +200,9 @@ def fix_issue(payload: dict, db: Session = Depends(get_db)):
                 result = run_scan_and_store()
                 raise HTTPException(
                     status_code=400,
-                    detail=f"No supported fixes were applied. Scan refreshed ({result['findings']} findings remaining)."
+                    detail=(
+                        "No safe auto-fixes were available. Current findings require review or manual remediation."
+                    )
                 )
 
             result = run_scan_and_store()
