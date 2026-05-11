@@ -10,6 +10,7 @@ from safeops.alerts.slack import send_slack_alert
 from safeops.cloud.aws.iam_priv_esc_scanner import scan_iam_privilege_escalation
 
 
+
 def run_scan_and_store():
     db = SessionLocal()
 
@@ -26,10 +27,17 @@ def run_scan_and_store():
         rds = scan_public_rds_instances(profile=profile, role_arn=role_arn)
         iam = scan_publicly_assumable_roles(profile=profile, role_arn=role_arn)
         iam_priv = scan_iam_privilege_escalation(profile=profile, role_arn=role_arn)
+        print("IAM PRIV ESC RESULT:", iam_priv)
 
         for result in [s3, sg, rds, iam, iam_priv]:
+
             if result.get("status") == "success":
+
                 all_findings.extend(result.get("findings", []))
+
+            else:
+
+                print("SCAN MODULE ERROR:", result.get("module"), result.get("error"))
 
         webhook_url = settings.slack_webhook_url if settings else None
 
