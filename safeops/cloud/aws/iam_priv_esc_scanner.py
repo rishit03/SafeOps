@@ -92,22 +92,15 @@ def scan_iam_privilege_escalation(profile=None, role_arn=None):
                         fingerprint=f"AWS_IAM_PRIV_ESC:{role_name}",
                         title=f"Privilege escalation risk in IAM role {role_name}",
                         severity="critical",
-                        description=(
-                            "Role contains IAM permissions that may enable privilege escalation."
-                        ),
-                        fix=(
-                            "Review and remove high-risk IAM actions such as "
-                            "iam:PassRole, iam:AttachRolePolicy, iam:PutRolePolicy, "
-                            "iam:CreatePolicyVersion, iam:SetDefaultPolicyVersion, "
-                            "or broad wildcard IAM permissions."
-                        ),
+                        description="Role contains IAM permissions that may enable privilege escalation.",
+                        fix="Restrict high-risk IAM actions and enforce least privilege.",
+                        auto_fix_supported=False,  # ✅ ADD THIS LINE
                         module="aws_iam_priv_esc",
-                        why_it_matters=(
-                            "Attackers who gain access to this role may be able to escalate "
-                            "privileges and gain broader control of the AWS account."
-                        ),
-                        impact="Possible privilege escalation and account compromise.",
+                        requires_elevation=False,
+                        why_it_matters="Attackers can escalate privileges to gain full control over the AWS account.",
+                        impact="Full account compromise possible.",
                         confidence="high",
+                        time_to_fix="5–15 minutes",
                         remediation_priority="Fix now",
                     )
 
