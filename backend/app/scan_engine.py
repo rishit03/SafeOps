@@ -8,6 +8,8 @@ from app.database import SessionLocal
 from app.models import Scan, Finding, WorkspaceSettings
 from safeops.alerts.slack import send_slack_alert
 from safeops.cloud.aws.iam_priv_esc_scanner import scan_iam_privilege_escalation
+from safeops.cloud.aws.attack_path_scanner import detect_attack_paths
+from safeops.engine.fix_prioritizer import classify_fix
 
 
 
@@ -27,7 +29,6 @@ def run_scan_and_store():
         rds = scan_public_rds_instances(profile=profile, role_arn=role_arn)
         iam = scan_publicly_assumable_roles(profile=profile, role_arn=role_arn)
         iam_priv = scan_iam_privilege_escalation(profile=profile, role_arn=role_arn)
-        print("IAM PRIV ESC RESULT:", iam_priv)
 
         for result in [s3, sg, rds, iam, iam_priv]:
 
@@ -38,6 +39,10 @@ def run_scan_and_store():
             else:
 
                 print("SCAN MODULE ERROR:", result.get("module"), result.get("error"))
+        
+        attack_paths = detect_attack_paths(all_findings)
+
+        all_findings.extend(attack_paths)
 
         webhook_url = settings.slack_webhook_url if settings else None
 
@@ -94,6 +99,13 @@ def run_scan_and_store():
 
             if not title.startswith("[default]"):
                 title = f"[default] {title}"
+            
+            fix_priority = classify_fix(f)
+
+            f["fix_priority"] = fix_priority["category"]
+            f["can_auto_fix"] = fix_priority["can_auto_fix"]
+            f["fix_reason"] = fix_priority["reason"]
+            f["recommended_action"] = fix_priority["recommended_action"]
 
             db.add(
                 Finding(

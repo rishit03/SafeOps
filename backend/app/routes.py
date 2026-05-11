@@ -11,6 +11,7 @@ from safeops.fixes.s3_fix import fix_s3_public_acl
 from safeops.fixes.rds_fix import fix_rds_public_instance
 from safeops.fixes.iam_fix import fix_iam_public_assume_role
 from app.scheduler import reschedule_scan_job
+from safeops.engine.fix_prioritizer import classify_fix
 
 
 router = APIRouter()
@@ -129,6 +130,20 @@ def fix_issue(payload: dict, db: Session = Depends(get_db)):
 
             for finding in findings:
                 if finding.severity not in ["critical", "high"]:
+                    continue
+
+                fix_classification = classify_fix(finding)
+
+                if fix_classification["category"] != "auto_fix_now":
+                    db.add(FixHistory(
+                        issue_id=finding.fingerprint,
+                        title=finding.title,
+                        severity=finding.severity,
+                        status=fix_classification["category"],
+                        message=f"Skipped: {fix_classification['reason']}",
+                        before_risk_score=before_score,
+                        after_risk_score=before_score,
+                    ))
                     continue
 
                 if not is_supported_fix(finding.fingerprint):
