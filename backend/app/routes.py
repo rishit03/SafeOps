@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
-from app.models import Activity, Finding, Scan, FixHistory
+from app.models import Activity, Finding, Scan, FixHistory, WorkspaceSettings
 from app.schemas import ScanIn, ScanOut
 from app.scan_engine import run_scan_and_store
 
@@ -36,12 +36,36 @@ def apply_fix(issue_id: str, role_arn: str | None = None) -> bool:
     if "AWS_IAM_PUBLIC_ASSUME_ROLE" in issue_id:
         return fix_iam_public_assume_role(issue_id, role_arn=role_arn)
 
-    raise HTTPException(status_code=400, detail="Unsupported issue type")
+    raise HTTPException(
+        status_code=400,
+        detail="SafeOps does not currently support automatic remediation for this finding.",
+    )
+
+def is_supported_fix(issue_id: str) -> bool:
+    supported_markers = [
+        "AWS_SECURITY_GROUP_PUBLIC_PORT",
+        "S3_PUBLIC_BUCKET",
+        "AWS_RDS_PUBLIC_INSTANCE",
+        "AWS_IAM_PUBLIC_ASSUME_ROLE",
+    ]
+
+    return any(marker in issue_id for marker in supported_markers)
 
 
 def log_activity(db: Session, action: str, details: str):
     db.add(Activity(action=action, details=details))
     db.commit()
+
+def serialize_settings(settings: WorkspaceSettings):
+    return {
+        "id": settings.id,
+        "aws_region": settings.aws_region,
+        "role_arn": settings.role_arn,
+        "slack_webhook_url": settings.slack_webhook_url,
+        "scan_frequency_minutes": settings.scan_frequency_minutes,
+        "scan_frequency": str(settings.scan_frequency_minutes),
+        "created_at": settings.created_at.isoformat() if settings.created_at else None,
+    }
 
 
 @router.post("/api/scans", response_model=ScanOut)
@@ -83,7 +107,8 @@ def get_latest_scan(db: Session = Depends(get_db)):
 def fix_issue(payload: dict, db: Session = Depends(get_db)):
     issue_id = payload.get("issue_id")
     all_critical = payload.get("all_critical", False)
-    role_arn = payload.get("role_arn")
+    settings = db.query(WorkspaceSettings).first()
+    role_arn = payload.get("role_arn") or (settings.role_arn if settings else None)
 
     try:
         latest_scan = db.query(Scan).order_by(Scan.created_at.desc()).first()
@@ -103,6 +128,18 @@ def fix_issue(payload: dict, db: Session = Depends(get_db)):
 
             for finding in findings:
                 if finding.severity not in ["critical", "high"]:
+                    continue
+
+                if not is_supported_fix(finding.fingerprint):
+                    db.add(FixHistory(
+                        issue_id=finding.fingerprint,
+                        title=finding.title,
+                        severity=finding.severity,
+                        status="unsupported",
+                        message="Skipped: automatic remediation is not supported for this finding.",
+                        before_risk_score=before_score,
+                        after_risk_score=before_score,
+                    ))
                     continue
 
                 success = apply_fix(finding.fingerprint, role_arn=role_arn)
@@ -171,6 +208,23 @@ def fix_issue(payload: dict, db: Session = Depends(get_db)):
                 .filter(Finding.scan_id == latest_scan.id)
                 .filter(Finding.fingerprint == issue_id)
                 .first()
+            )
+
+        if not is_supported_fix(issue_id):
+            db.add(FixHistory(
+                issue_id=issue_id,
+                title=matched.title if matched else issue_id,
+                severity=matched.severity if matched else "unknown",
+                status="unsupported",
+                message="SafeOps does not currently support automatic remediation for this finding.",
+                before_risk_score=before_score,
+                after_risk_score=before_score,
+            ))
+            db.commit()
+
+            raise HTTPException(
+                status_code=400,
+                detail="SafeOps does not currently support automatic remediation for this finding.",
             )
 
         success = apply_fix(issue_id, role_arn=role_arn)
@@ -264,10 +318,12 @@ def get_activity(db: Session = Depends(get_db)):
 def get_scan_history(db: Session = Depends(get_db)):
     scans = (
         db.query(Scan)
-        .order_by(Scan.created_at.asc())
+        .order_by(Scan.created_at.desc())
         .limit(20)
         .all()
     )
+
+    scans = list(reversed(scans))
 
     return [
         {
@@ -281,8 +337,6 @@ def get_scan_history(db: Session = Depends(get_db)):
 
 @router.get("/api/settings")
 def get_settings(db: Session = Depends(get_db)):
-    from app.models import WorkspaceSettings
-
     settings = db.query(WorkspaceSettings).first()
 
     if not settings:
@@ -291,13 +345,11 @@ def get_settings(db: Session = Depends(get_db)):
         db.commit()
         db.refresh(settings)
 
-    return settings
+    return serialize_settings(settings)
 
 
 @router.post("/api/settings")
 def update_settings(payload: dict, db: Session = Depends(get_db)):
-    from app.models import WorkspaceSettings
-
     settings = db.query(WorkspaceSettings).first()
 
     if not settings:
@@ -311,10 +363,19 @@ def update_settings(payload: dict, db: Session = Depends(get_db)):
         "slack_webhook_url",
         settings.slack_webhook_url,
     )
-    settings.scan_frequency_minutes = payload.get(
+
+    frequency_value = payload.get(
         "scan_frequency_minutes",
-        settings.scan_frequency_minutes,
+        payload.get("scan_frequency", settings.scan_frequency_minutes),
     )
+
+    try:
+        settings.scan_frequency_minutes = int(frequency_value)
+    except (TypeError, ValueError):
+        raise HTTPException(
+            status_code=400,
+            detail="Scan frequency must be a number of minutes",
+        )
 
     db.commit()
     db.refresh(settings)
@@ -322,7 +383,7 @@ def update_settings(payload: dict, db: Session = Depends(get_db)):
     return {
         "success": True,
         "message": "Settings updated",
-        "settings": settings,
+        "settings": serialize_settings(settings),
     }
 
 @router.post("/api/settings/test-aws")
