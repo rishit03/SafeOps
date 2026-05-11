@@ -7,6 +7,7 @@ import os
 from app.database import SessionLocal
 from app.models import Scan, Finding, WorkspaceSettings
 from safeops.alerts.slack import send_slack_alert
+from safeops.cloud.aws.iam_priv_esc_scanner import scan_iam_privilege_escalation
 
 
 def run_scan_and_store():
@@ -24,8 +25,9 @@ def run_scan_and_store():
         sg = scan_security_groups(profile=profile, role_arn=role_arn)
         rds = scan_public_rds_instances(profile=profile, role_arn=role_arn)
         iam = scan_publicly_assumable_roles(profile=profile, role_arn=role_arn)
+        iam_priv = scan_iam_privilege_escalation(profile=profile, role_arn=role_arn)
 
-        for result in [s3, sg, rds, iam]:
+        for result in [s3, sg, rds, iam, iam_priv]:
             if result.get("status") == "success":
                 all_findings.extend(result.get("findings", []))
 

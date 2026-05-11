@@ -4,6 +4,7 @@ from app.database import SessionLocal
 from app.models import WorkspaceSettings
 
 scheduler = BackgroundScheduler()
+JOB_ID = "safeops_scheduled_scan"
 
 
 def scheduled_scan():
@@ -22,6 +23,24 @@ def scheduled_scan():
         db.close()
 
 
+def reschedule_scan_job(interval_minutes: int):
+    if interval_minutes < 1:
+        interval_minutes = 60
+
+    if not scheduler.running:
+        scheduler.start()
+
+    scheduler.add_job(
+        scheduled_scan,
+        "interval",
+        minutes=interval_minutes,
+        id=JOB_ID,
+        replace_existing=True,
+    )
+
+    print(f"Scheduled scan interval set to {interval_minutes} minutes")
+
+
 def start_scheduler():
     db = SessionLocal()
 
@@ -32,15 +51,4 @@ def start_scheduler():
     finally:
         db.close()
 
-    if scheduler.running:
-        return
-
-    scheduler.add_job(
-        scheduled_scan,
-        "interval",
-        minutes=interval,
-        id="safeops_scheduled_scan",
-        replace_existing=True,
-    )
-
-    scheduler.start()
+    reschedule_scan_job(interval)

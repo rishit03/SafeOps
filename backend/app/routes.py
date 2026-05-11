@@ -10,6 +10,7 @@ from safeops.fixes.security_group_fix import fix_security_group_public_port
 from safeops.fixes.s3_fix import fix_s3_public_acl
 from safeops.fixes.rds_fix import fix_rds_public_instance
 from safeops.fixes.iam_fix import fix_iam_public_assume_role
+from app.scheduler import reschedule_scan_job
 
 
 router = APIRouter()
@@ -245,19 +246,31 @@ def fix_issue(payload: dict, db: Session = Depends(get_db)):
                 title=matched.title if matched else issue_id,
                 severity=matched.severity if matched else "unknown",
                 status="success",
-                message="Fix applied successfully",
+                message=(
+                    "RDS fix requested successfully. AWS may take several minutes to apply the change."
+                    if "AWS_RDS_PUBLIC_INSTANCE" in issue_id
+                    else "Fix applied successfully"
+                ),
                 before_risk_score=before_score,
                 after_risk_score=after_score,
             ))
 
             db.commit()
 
+            message = (
+                f"Fix applied and scan refreshed "
+                f"({result['findings']} findings remaining)"
+            )
+
+            if "AWS_RDS_PUBLIC_INSTANCE" in issue_id:
+                message = (
+                    "RDS fix requested successfully. AWS may take several minutes to apply "
+                    f"the change. Scan refreshed ({result['findings']} findings remaining)."
+                )
+
             return {
                 "success": True,
-                "message": (
-                    f"Fix applied and scan refreshed "
-                    f"({result['findings']} findings remaining)"
-                ),
+                "message": message,
             }
 
         db.add(FixHistory(
@@ -379,6 +392,8 @@ def update_settings(payload: dict, db: Session = Depends(get_db)):
 
     db.commit()
     db.refresh(settings)
+
+    reschedule_scan_job(settings.scan_frequency_minutes)
 
     return {
         "success": True,
