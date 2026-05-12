@@ -308,3 +308,44 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important; }
 }
+
+.attack-flow {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr auto 1fr;
+  gap: 16px;
+  align-items: center;
+}
+
+.attack-column {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.attack-column-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.attack-node {
+  padding: 10px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.04);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.attack-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cyan);
+}
+
+.attack-empty {
+  font-size: 12px;
+  color: var(--subtle);
+}

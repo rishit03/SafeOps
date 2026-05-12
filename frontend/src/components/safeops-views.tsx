@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ComponentType } from "react";
 import {
   Activity,
   AlertCircle,
@@ -380,21 +380,109 @@ export function FindingsPage() {
 
 export function AttackPathsPage() {
   const { bundle } = useSafeOps();
-  const risky = highSignalFindings(bundle.latest?.findings || []).slice(0, 6);
+  const findings = bundle.latest?.findings || [];
+
+  const entryPoints = findings.filter((f) =>
+    String(f.fingerprint || "").includes("SECURITY_GROUP_PUBLIC_PORT")
+  );
+
+  const privilegeEsc = findings.filter((f) =>
+    String(f.fingerprint || "").includes("IAM_PRIV_ESC")
+  );
+
+  const dataExposure = findings.filter((f) =>
+    String(f.fingerprint || "").includes("S3_")
+  );
+
   return (
     <Frame active="attack-paths">
-      <PageHeader eyebrow="Attack paths" title="How exposure chains together." description="A readable map of likely paths from internet exposure to sensitive resources." />
-      <Card className="path-canvas">
-        {risky.length ? risky.map((finding, index) => (
-          <div className="path-node" key={String(findingFingerprint(finding))} style={{ animationDelay: `${index * 90}ms` }}>
-            <Badge tone={severityTone(finding.severity)}>{finding.severity}</Badge>
-            <h3><FindingTitle finding={finding} /></h3>
-            <p><FindingMeta finding={finding} /></p>
-            {index < risky.length - 1 ? <ArrowDownRight className="path-arrow" /> : null}
+      <PageHeader
+        eyebrow="Attack paths"
+        title="How compromise can happen."
+        description="SafeOps shows how individual risks can combine into real attack paths."
+      />
+
+      <Card>
+        {entryPoints.length || privilegeEsc.length || dataExposure.length ? (
+          <div className="attack-flow">
+            {/* Entry */}
+            <AttackColumn
+              title="Entry point"
+              icon={ShieldAlert}
+              items={entryPoints}
+            />
+
+            {/* Arrow */}
+            <AttackArrow />
+
+            {/* Priv Esc */}
+            <AttackColumn
+              title="Privilege escalation"
+              icon={KeyRound}
+              items={privilegeEsc}
+            />
+
+            {/* Arrow */}
+            <AttackArrow />
+
+            {/* Data */}
+            <AttackColumn
+              title="Data exposure"
+              icon={Database}
+              items={dataExposure}
+            />
           </div>
-        )) : <EmptyState icon={GitBranch} title="No attack path yet" description="High and critical findings will be translated into readable path cards after a scan." />}
+        ) : (
+          <EmptyState
+            icon={GitBranch}
+            title="No attack paths detected"
+            description="SafeOps will map risk chains when multiple exposures can combine into a real compromise path."
+          />
+        )}
       </Card>
     </Frame>
+  );
+}
+
+function AttackColumn({
+  title,
+  icon: Icon,
+  items,
+}: {
+  title: string;
+  icon: ComponentType<{ className?: string }>;
+  items: Finding[];
+}) {
+  return (
+    <div className="attack-column">
+      <div className="attack-column-header">
+        <Icon className="h-5 w-5" />
+        <h3>{title}</h3>
+      </div>
+
+      <div className="attack-column-list">
+        {items.length ? (
+          items.map((f) => (
+            <div key={String(findingFingerprint(f))} className="attack-node">
+              <Badge tone={severityTone(f.severity)}>
+                {f.severity}
+              </Badge>
+              <span>{f.title}</span>
+            </div>
+          ))
+        ) : (
+          <p className="attack-empty">No signal</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function AttackArrow() {
+  return (
+    <div className="attack-arrow">
+      <ArrowDownRight className="h-6 w-6" />
+    </div>
   );
 }
 
