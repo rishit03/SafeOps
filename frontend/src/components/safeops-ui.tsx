@@ -45,8 +45,20 @@ export function Button({
   children,
   variant = "primary",
   className,
+  asChild,
   ...props
-}: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "primary" | "secondary" | "danger" | "ghost" }) {
+}: React.ButtonHTMLAttributes<HTMLButtonElement> & {
+  variant?: "primary" | "secondary" | "danger" | "ghost";
+  asChild?: boolean;
+}) {
+  if (asChild) {
+    return (
+      <span className={cx("safeops-button", `safeops-button-${variant}`, className)}>
+        {children}
+      </span>
+    );
+  }
+
   return (
     <button className={cx("safeops-button", `safeops-button-${variant}`, className)} {...props}>
       {children}

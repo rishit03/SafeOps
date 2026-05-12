@@ -190,6 +190,23 @@ export function OverviewPage() {
   const lastScan = scanTimestamp(scan);
   const topFindings = highSignalFindings(findings).slice(0, 4);
 
+  if (!scan) {
+    return (
+      <Frame active="overview">
+        <PageHeader
+          eyebrow="Overview"
+          title="Welcome to SafeOps"
+          description="Connect AWS and complete setup to start securing your cloud."
+        />
+
+        <div className="stack-list">
+          <SetupProgress />
+          <OnboardingFlow />
+        </div>
+      </Frame>
+    );
+  }
+
   return (
     <Frame active="overview">
       <PageHeader eyebrow="Overview" title="Cloud posture, simplified." description="A calm operating view for the risks that need action now." />
@@ -600,5 +617,133 @@ export function PlannedPage() {
         <PlannedPanel title="Compliance packs">Map SafeOps findings to startup security checklists.</PlannedPanel>
       </section>
     </Frame>
+  );
+}
+
+function SetupProgress() {
+  const { bundle } = useSafeOps();
+
+  const awsConnected = bundle.settings?.aws_connected;
+  const slackConfigured = bundle.settings?.slack_configured;
+  const hasScan = !!bundle.latest;
+
+  const items = [
+    {
+      label: "AWS connected",
+      done: awsConnected,
+    },
+    {
+      label: "Slack alerts configured",
+      done: slackConfigured,
+    },
+    {
+      label: "First scan completed",
+      done: hasScan,
+    },
+  ];
+
+  return (
+    <Card className="setup-progress">
+      <div className="section-title">
+        <div>
+          <p className="eyebrow">Setup progress</p>
+          <h2>Complete your setup</h2>
+        </div>
+      </div>
+
+      <div className="setup-list">
+        {items.map((item, index) => (
+          <div key={index} className="setup-item">
+            {item.done ? (
+              <CheckCircle2 className="h-5 w-5 text-green-400" />
+            ) : (
+              <AlertCircle className="h-5 w-5 text-amber-400" />
+            )}
+            <span>{item.label}</span>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+function OnboardingFlow() {
+  const { bundle, runScan, testAws, testingAws } = useSafeOps();
+
+  const awsConnected = bundle.settings?.aws_connected;
+  const slackConfigured = bundle.settings?.slack_configured;
+
+  return (
+    <Card className="onboarding">
+      <div className="section-title">
+        <div>
+          <p className="eyebrow">Get started</p>
+          <h2>Secure your AWS in minutes</h2>
+        </div>
+      </div>
+
+      <div className="onboarding-steps">
+        {/* AWS */}
+        <div className="onboarding-step">
+          <CloudCog className="h-6 w-6" />
+          <h3>1. Configure AWS</h3>
+          <p>Set region and role ARN in settings</p>
+
+          <div className="onboarding-actions">
+            <Button asChild variant="secondary">
+              <a href="/settings">Go to settings</a>
+            </Button>
+
+            <Button
+              variant="ghost"
+              onClick={testAws}
+              disabled={testingAws}
+            >
+              {testingAws ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <TerminalSquare className="h-4 w-4" />
+              )}
+              Test connection
+            </Button>
+          </div>
+
+          {awsConnected && (
+            <Badge tone="tone-green">Connected</Badge>
+          )}
+        </div>
+
+        {/* Slack */}
+        <div className="onboarding-step">
+          <MessageSquare className="h-6 w-6" />
+          <h3>2. Enable alerts</h3>
+          <p>Add Slack webhook for real-time alerts</p>
+
+          <div className="onboarding-actions">
+            <Button asChild variant="secondary">
+              <a href="/settings">Add Slack</a>
+            </Button>
+          </div>
+
+          {slackConfigured && (
+            <Badge tone="tone-green">Configured</Badge>
+          )}
+        </div>
+
+        {/* Scan */}
+        <div className="onboarding-step">
+          <RadioTower className="h-6 w-6" />
+          <h3>3. Run first scan</h3>
+          <p>SafeOps will detect risks instantly</p>
+
+          <div className="onboarding-actions">
+            <Button onClick={runScan}>
+              <RadioTower className="h-4 w-4" />
+              Run scan
+            </Button>
+          </div>
+        </div>
+      </div>
+    </Card>
   );
 }
