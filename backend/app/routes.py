@@ -58,14 +58,48 @@ def log_activity(db: Session, action: str, details: str):
     db.add(Activity(action=action, details=details))
     db.commit()
 
+def check_aws_connected(settings: WorkspaceSettings | None) -> bool:
+    import boto3
+
+    try:
+        region = settings.aws_region if settings and settings.aws_region else "us-east-1"
+        session = boto3.Session(region_name=region)
+
+        if settings and settings.role_arn:
+            sts = session.client("sts")
+            assumed = sts.assume_role(
+                RoleArn=settings.role_arn,
+                RoleSessionName="safeops-settings-check",
+            )
+
+            creds = assumed["Credentials"]
+
+            session = boto3.Session(
+                aws_access_key_id=creds["AccessKeyId"],
+                aws_secret_access_key=creds["SecretAccessKey"],
+                aws_session_token=creds["SessionToken"],
+                region_name=region,
+            )
+
+        session.client("sts").get_caller_identity()
+        return True
+
+    except Exception:
+        return False
+
 def serialize_settings(settings: WorkspaceSettings):
     return {
         "id": settings.id,
         "aws_region": settings.aws_region,
+        "region": settings.aws_region,
         "role_arn": settings.role_arn,
         "slack_webhook_url": settings.slack_webhook_url,
         "scan_frequency_minutes": settings.scan_frequency_minutes,
+        "scheduled_scan_frequency_minutes": settings.scan_frequency_minutes,
         "scan_frequency": str(settings.scan_frequency_minutes),
+        "aws_connected": check_aws_connected(settings),
+        "slack_configured": bool(settings.slack_webhook_url),
+        "slack_enabled": bool(settings.slack_webhook_url),
         "created_at": settings.created_at.isoformat() if settings.created_at else None,
     }
 
@@ -118,7 +152,12 @@ def fix_issue(payload: dict, db: Session = Depends(get_db)):
 
         if all_critical:
             if not latest_scan:
-                return {"success": False, "message": "No scan data available"}
+                return {
+                    "success": False,
+                    "ok": False,
+                    "status": "failed",
+                    "message": "No scan data available",
+                }
 
             findings = (
                 db.query(Finding)
@@ -209,6 +248,9 @@ def fix_issue(payload: dict, db: Session = Depends(get_db)):
 
             return {
                 "success": True,
+                "ok": True,
+                "status": "success",
+                "fixed": applied,
                 "message": (
                     f"Applied {applied} high-signal fixes and refreshed scan "
                     f"({result['findings']} findings remaining)"
@@ -287,6 +329,8 @@ def fix_issue(payload: dict, db: Session = Depends(get_db)):
 
             return {
                 "success": True,
+                "ok": True,
+                "status": "success",
                 "message": message,
             }
 
@@ -326,6 +370,8 @@ def run_scan(db: Session = Depends(get_db)):
 
         return {
             "success": True,
+            "ok": True,
+            "status": "success",
             "message": "Scan completed successfully",
         }
 
@@ -412,11 +458,7 @@ def update_settings(payload: dict, db: Session = Depends(get_db)):
 
     reschedule_scan_job(settings.scan_frequency_minutes)
 
-    return {
-        "success": True,
-        "message": "Settings updated",
-        "settings": serialize_settings(settings),
-    }
+    return serialize_settings(settings)
 
 @router.post("/api/settings/test-aws")
 def test_aws_connection(db: Session = Depends(get_db)):
@@ -448,6 +490,8 @@ def test_aws_connection(db: Session = Depends(get_db)):
 
         return {
             "success": True,
+            "ok": True,
+            "status": "success",
             "message": "AWS connection successful",
             "account_id": identity.get("Account"),
             "arn": identity.get("Arn"),
@@ -456,6 +500,8 @@ def test_aws_connection(db: Session = Depends(get_db)):
     except Exception as e:
         return {
             "success": False,
+            "ok": False,
+            "status": "failed",
             "message": str(e),
         }
     
