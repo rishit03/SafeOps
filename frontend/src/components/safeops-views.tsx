@@ -181,7 +181,7 @@ function RiskChart() {
 
 export function OverviewPage() {
   const [showSetupComplete, setShowSetupComplete] = useState(true);
-  const { bundle, fixCritical, fixingAll } = useSafeOps();
+  const { bundle, fixCritical, fixingAll, activeAccountId } = useSafeOps();
   const scan = bundle.latest;
   const findings = scan?.findings || [];
   const critical = findings.filter((finding) => String(finding.severity).toLowerCase() === "critical").length;
@@ -197,13 +197,13 @@ export function OverviewPage() {
 
   const setupComplete = awsConnected && slackConfigured && hasScan;
 
-  if (!hasScan) {
+  if (!hasScan && activeAccountId) {
     return (
       <Frame active="overview">
         <PageHeader
           eyebrow="Overview"
-          title="Welcome to SafeOps"
-          description="Connect AWS and complete setup to start securing your cloud."
+          title="No scans for this account"
+          description="Run your first scan to see security findings for this AWS account."
         />
 
         <div className="stack-list">

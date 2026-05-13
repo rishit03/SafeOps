@@ -135,8 +135,13 @@ def create_scan(scan_in: ScanIn, db: Session = Depends(get_db)):
 
 
 @router.get("/api/scans/latest", response_model=ScanOut | None)
-def get_latest_scan(db: Session = Depends(get_db)):
-    return db.query(Scan).order_by(Scan.created_at.desc()).first()
+def get_latest_scan(account_id: int | None = None, db: Session = Depends(get_db)):
+    query = db.query(Scan)
+
+    if account_id:
+        query = query.filter(Scan.cloud_account_id == account_id)
+
+    return query.order_by(Scan.created_at.desc()).first()
 
 
 @router.post("/api/fix")

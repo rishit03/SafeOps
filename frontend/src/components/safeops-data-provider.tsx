@@ -58,22 +58,41 @@ export function SafeOpsDataProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     setRefreshing(true);
+
     try {
-      const data = await loadSafeOpsBundle();
+      const data = await loadSafeOpsBundle(activeAccountId);
       setBundle(data);
-      if (data.cloudAccounts.length && !activeAccountId) {
-        const defaultAccount = data.cloudAccounts.find(a => a.is_default);
-        setActiveAccountId(defaultAccount?.id || data.cloudAccounts[0].id);
-      }
     } finally {
       setRefreshing(false);
       setLoading(false);
     }
+  }, [activeAccountId]);
+
+  useEffect(() => {
+    async function initialLoad() {
+      setLoading(true);
+
+      try {
+        const data = await loadSafeOpsBundle();
+        setBundle(data);
+
+        if (data.cloudAccounts.length) {
+          const defaultAccount = data.cloudAccounts.find((account) => account.is_default);
+          setActiveAccountId(defaultAccount?.id || data.cloudAccounts[0].id);
+        }
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    initialLoad();
   }, []);
 
   useEffect(() => {
+    if (!activeAccountId || loading) return;
+
     refresh();
-  }, [refresh]);
+  }, [activeAccountId]);
 
   const runScan = useCallback(async () => {
     setScanning(true);
@@ -153,8 +172,20 @@ export function SafeOpsDataProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+    const accountAwareBundle = useMemo(() => {
+      if (!activeAccountId) return bundle;
+
+      const latestBelongsToActiveAccount =
+        bundle.latest?.cloud_account_id === activeAccountId;
+
+      return {
+        ...bundle,
+        latest: latestBelongsToActiveAccount ? bundle.latest : null,
+      };
+    }, [bundle, activeAccountId]);
+
   const value = useMemo<SafeOpsContextValue>(() => ({
-    bundle,
+    bundle: accountAwareBundle,
     loading,
     refreshing,
     scanning,
@@ -170,7 +201,7 @@ export function SafeOpsDataProvider({ children }: { children: ReactNode }) {
     saveSettings,
     testAws,
     setActiveAccountId,
-  }), [bundle, loading, refreshing, scanning, fixingAll, fixingOne, saving, testingAws, refresh, runScan, fixFinding, fixCritical, saveSettings, testAws]);
+  }), [accountAwareBundle, loading, refreshing, scanning, fixingAll, fixingOne, saving, testingAws, refresh, runScan, fixFinding, fixCritical, saveSettings, testAws]);
 
   return <SafeOpsContext.Provider value={value}>{children}</SafeOpsContext.Provider>;
 }

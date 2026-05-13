@@ -196,11 +196,11 @@ export function SafeOpsShell({ bundle, active, children }: { bundle: ApiBundle; 
                 {bundle.cloudAccounts.length ? (
                   bundle.cloudAccounts.map((account) => (
                     <option key={account.id} value={account.id}>
-                      {account.name}
+                      {account.name} (AWS)
                     </option>
                   ))
                 ) : (
-                  <option value="">Default Account</option>
+                  <option value="">Default Account (AWS)</option>
                 )}
                 <option disabled>+ Add account (soon)</option>
               </select>

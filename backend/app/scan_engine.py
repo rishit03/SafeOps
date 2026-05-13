@@ -20,8 +20,13 @@ def run_scan_and_store(account_id=None):
     try:
         settings = db.query(WorkspaceSettings).first()
 
+        if account_id:
+            account = db.query(CloudAccount).filter(CloudAccount.id == account_id).first()
+        else:
+            account = db.query(CloudAccount).filter(CloudAccount.is_default == True).first()
+
         profile = None
-        role_arn = settings.role_arn if settings and settings.role_arn else None
+        role_arn = account.role_arn if account and account.role_arn else None
 
         all_findings = []
 
@@ -58,7 +63,7 @@ def run_scan_and_store(account_id=None):
             if critical_findings:
                 send_slack_alert(
                     webhook_url,
-                    f"🚨 SafeOps Alert: {len(critical_findings)} critical issues detected in AWS",
+                    f"🚨 SafeOps Alert: {len(critical_findings)} critical issues detected in {account.name if account else 'AWS'}",
                 )
 
         risk_score = 0
@@ -80,11 +85,6 @@ def run_scan_and_store(account_id=None):
             risk_level = "Moderate"
         else:
             risk_level = "Low"
-
-        if account_id:
-            account = db.query(CloudAccount).filter(CloudAccount.id == account_id).first()
-        else:
-            account = db.query(CloudAccount).filter(CloudAccount.is_default == True).first()
 
         scan = Scan(
             profile="default",

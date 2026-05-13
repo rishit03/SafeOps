@@ -45,7 +45,10 @@ function errorMessage(reason: unknown): string {
 }
 
 export const safeopsApi = {
-  latestScan: () => request<Scan | null>("/api/scans/latest"),
+  latestScan: (accountId?: number | null) =>
+    request<Scan | null>(
+      accountId ? `/api/scans/latest?account_id=${accountId}` : "/api/scans/latest"
+    ),
   scanHistory: () => request<Scan[]>("/api/scans/history"),
   runScan: (accountId?: number | null) =>
     request<Scan | { message?: string }>("/api/scan/run", {
@@ -62,9 +65,9 @@ export const safeopsApi = {
   cloudAccounts: () => request<CloudAccount[]>("/api/cloud-accounts"),
 };
 
-export async function loadSafeOpsBundle(): Promise<ApiBundle> {
+export async function loadSafeOpsBundle(accountId?: number | null): Promise<ApiBundle> {
   const [latest, history, activity, fixHistory, settings, cloudAccounts] = await Promise.allSettled([
-    safeopsApi.latestScan(),
+    safeopsApi.latestScan(accountId),
     safeopsApi.scanHistory(),
     safeopsApi.activity(),
     safeopsApi.fixHistory(),

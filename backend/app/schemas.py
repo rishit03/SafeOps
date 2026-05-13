@@ -28,6 +28,7 @@ class FindingOut(FindingIn):
 
 class ScanOut(BaseModel):
     id: int
+    cloud_account_id: int | None = None
     profile: str
     risk_score: int
     risk_level: str

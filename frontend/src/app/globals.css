@@ -556,6 +556,36 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   margin-top: 28px;
 }
 
+.landing-features {
+  margin-top: 60px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+  max-width: 900px;
+}
+
+.landing-feature {
+  padding: 20px;
+  border-radius: 20px;
+  background: rgba(255,255,255,0.04);
+}
+
+.feature-icon {
+  color: var(--cyan);
+  margin-bottom: 10px;
+}
+
+.landing-feature h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.landing-feature p {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
 .connect-page {
   display: grid;
   gap: 24px;

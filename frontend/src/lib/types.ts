@@ -30,6 +30,7 @@ export type Finding = {
 
 export type Scan = {
   id?: string;
+  cloud_account_id?: number | null;
   created_at?: string;
   timestamp?: string;
   scanned_at?: string;
