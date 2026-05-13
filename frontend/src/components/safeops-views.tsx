@@ -191,7 +191,7 @@ export function OverviewPage() {
   const lastScan = scanTimestamp(scan);
   const topFindings = highSignalFindings(findings).slice(0, 4);
 
-  const awsConnected = bundle.settings?.aws_connected;
+  const awsConnected = bundle.settings?.aws_connected === true;
   const slackConfigured = bundle.settings?.slack_configured;
   const hasScan = !!scan;
 
@@ -646,7 +646,7 @@ export function PlannedPage() {
 function SetupProgress() {
   const { bundle } = useSafeOps();
 
-  const awsConnected = bundle.settings?.aws_connected;
+  const awsConnected = bundle.settings?.aws_connected === true;
   const slackConfigured = bundle.settings?.slack_configured;
   const hasScan = !!bundle.latest;
 
@@ -693,7 +693,7 @@ function SetupProgress() {
 function OnboardingFlow() {
   const { bundle, runScan, testAws, testingAws } = useSafeOps();
 
-  const awsConnected = bundle.settings?.aws_connected;
+  const awsConnected = bundle.settings?.aws_connected === true;
   const slackConfigured = bundle.settings?.slack_configured;
 
   return (

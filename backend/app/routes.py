@@ -97,7 +97,7 @@ def serialize_settings(settings: WorkspaceSettings):
         "scan_frequency_minutes": settings.scan_frequency_minutes,
         "scheduled_scan_frequency_minutes": settings.scan_frequency_minutes,
         "scan_frequency": str(settings.scan_frequency_minutes),
-        "aws_connected": check_aws_connected(settings),
+        "aws_connected": bool(settings.aws_connected),
         "slack_configured": bool(settings.slack_webhook_url),
         "slack_enabled": bool(settings.slack_webhook_url),
         "created_at": settings.created_at.isoformat() if settings.created_at else None,
@@ -492,14 +492,18 @@ def update_settings(payload: dict, db: Session = Depends(get_db)):
 @router.post("/api/settings/test-aws")
 def test_aws_connection(db: Session = Depends(get_db)):
     import boto3
-    from app.models import WorkspaceSettings
 
     settings = db.query(WorkspaceSettings).first()
 
-    try:
-        session = boto3.Session(region_name=settings.aws_region if settings else "us-east-1")
+    if not settings:
+        settings = WorkspaceSettings()
+        db.add(settings)
+        db.flush()
 
-        if settings and settings.role_arn:
+    try:
+        session = boto3.Session(region_name=settings.aws_region or "us-east-1")
+
+        if settings.role_arn:
             sts = session.client("sts")
             assumed = sts.assume_role(
                 RoleArn=settings.role_arn,
@@ -517,6 +521,9 @@ def test_aws_connection(db: Session = Depends(get_db)):
 
         identity = session.client("sts").get_caller_identity()
 
+        settings.aws_connected = True
+        db.commit()
+
         return {
             "success": True,
             "ok": True,
@@ -527,6 +534,9 @@ def test_aws_connection(db: Session = Depends(get_db)):
         }
 
     except Exception as e:
+        settings.aws_connected = False
+        db.commit()
+
         return {
             "success": False,
             "ok": False,

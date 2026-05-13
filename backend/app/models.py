@@ -66,6 +66,7 @@ class WorkspaceSettings(Base):
     slack_webhook_url = Column(String, nullable=True)
     scan_frequency_minutes = Column(Integer, default=60)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    aws_connected = Column(Boolean, default=False)
 
 class FixHistory(Base):
     __tablename__ = "fix_history"
