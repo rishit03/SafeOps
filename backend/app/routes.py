@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
-from app.models import Activity, Finding, Scan, FixHistory, WorkspaceSettings
+from app.models import Activity, Finding, Scan, FixHistory, WorkspaceSettings, CloudAccount
 from app.schemas import ScanIn, ScanOut
 from app.scan_engine import run_scan_and_store
 
@@ -358,9 +358,10 @@ def fix_issue(payload: dict, db: Session = Depends(get_db)):
 
 
 @router.post("/api/scan/run")
-def run_scan(db: Session = Depends(get_db)):
+def run_scan(payload: dict = {}, db: Session = Depends(get_db)):
+    account_id = payload.get("account_id")
     try:
-        result = run_scan_and_store()
+        result = run_scan_and_store(account_id=account_id)
 
         log_activity(
             db,
@@ -422,6 +423,29 @@ def get_settings(db: Session = Depends(get_db)):
         db.refresh(settings)
 
     return serialize_settings(settings)
+
+@router.get("/api/cloud-accounts")
+def get_cloud_accounts(db: Session = Depends(get_db)):
+    accounts = (
+        db.query(CloudAccount)
+        .order_by(CloudAccount.is_default.desc(), CloudAccount.created_at.asc())
+        .all()
+    )
+
+    return [
+        {
+            "id": account.id,
+            "name": account.name,
+            "provider": account.provider,
+            "aws_account_id": account.aws_account_id,
+            "aws_region": account.aws_region,
+            "role_arn": account.role_arn,
+            "is_default": account.is_default,
+            "status": account.status,
+            "created_at": account.created_at.isoformat() if account.created_at else None,
+        }
+        for account in accounts
+    ]
 
 
 @router.post("/api/settings")
@@ -513,3 +537,8 @@ def get_fix_history(db: Session = Depends(get_db)):
         .limit(20)
         .all()
     )
+
+@router.post("/api/scan/run")
+def run_scan(payload: dict = {}, db: Session = Depends(get_db)):
+    account_id = payload.get("account_id")
+    print("ACCOUNT ID RECEIVED:", account_id)

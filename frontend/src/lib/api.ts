@@ -1,4 +1,4 @@
-import type { ActivityItem, ApiBundle, AwsTestResponse, FixHistoryItem, FixResponse, Scan, Settings } from "./types";
+import type { ActivityItem, ApiBundle, AwsTestResponse, CloudAccount, FixHistoryItem, FixResponse, Scan, Settings } from "./types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "";
 
@@ -47,7 +47,11 @@ function errorMessage(reason: unknown): string {
 export const safeopsApi = {
   latestScan: () => request<Scan | null>("/api/scans/latest"),
   scanHistory: () => request<Scan[]>("/api/scans/history"),
-  runScan: () => request<Scan | { message?: string }>("/api/scan/run", { method: "POST" }),
+  runScan: (accountId?: number | null) =>
+    request<Scan | { message?: string }>("/api/scan/run", {
+      method: "POST",
+      body: JSON.stringify({ account_id: accountId }),
+    }),
   fixOne: (fingerprint: string) => request<FixResponse>("/api/fix", { method: "POST", body: JSON.stringify({ issue_id: fingerprint }) }),
   fixCritical: () => request<FixResponse>("/api/fix", { method: "POST", body: JSON.stringify({ all_critical: true }) }),
   activity: () => request<ActivityItem[]>("/api/activity"),
@@ -55,15 +59,17 @@ export const safeopsApi = {
   settings: () => request<Settings>("/api/settings"),
   saveSettings: (settings: Settings) => request<Settings>("/api/settings", { method: "POST", body: JSON.stringify(settings) }),
   testAws: () => request<AwsTestResponse>("/api/settings/test-aws", { method: "POST" }),
+  cloudAccounts: () => request<CloudAccount[]>("/api/cloud-accounts"),
 };
 
 export async function loadSafeOpsBundle(): Promise<ApiBundle> {
-  const [latest, history, activity, fixHistory, settings] = await Promise.allSettled([
+  const [latest, history, activity, fixHistory, settings, cloudAccounts] = await Promise.allSettled([
     safeopsApi.latestScan(),
     safeopsApi.scanHistory(),
     safeopsApi.activity(),
     safeopsApi.fixHistory(),
     safeopsApi.settings(),
+    safeopsApi.cloudAccounts(),
   ]);
 
   return {
@@ -72,12 +78,14 @@ export async function loadSafeOpsBundle(): Promise<ApiBundle> {
     activity: activity.status === "fulfilled" && Array.isArray(activity.value) ? activity.value : [],
     fixHistory: fixHistory.status === "fulfilled" && Array.isArray(fixHistory.value) ? fixHistory.value : [],
     settings: settings.status === "fulfilled" ? settings.value : null,
+    cloudAccounts: cloudAccounts.status === "fulfilled" && Array.isArray(cloudAccounts.value) ? cloudAccounts.value : [],
     errors: {
       latest: latest.status === "rejected" ? errorMessage(latest.reason) : undefined,
       history: history.status === "rejected" ? errorMessage(history.reason) : undefined,
       activity: activity.status === "rejected" ? errorMessage(activity.reason) : undefined,
       fixHistory: fixHistory.status === "rejected" ? errorMessage(fixHistory.reason) : undefined,
       settings: settings.status === "rejected" ? errorMessage(settings.reason) : undefined,
+      cloudAccounts: cloudAccounts.status === "rejected" ? errorMessage(cloudAccounts.reason) : undefined,
     },
   };
 }

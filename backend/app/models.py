@@ -1,19 +1,35 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, JSON
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, JSON, Boolean
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
 
 from app.database import Base
 
+class CloudAccount(Base):
+    __tablename__ = "cloud_accounts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, default="Default Account")
+    provider = Column(String, default="aws")
+    aws_account_id = Column(String, nullable=True)
+    aws_region = Column(String, default="us-east-1")
+    role_arn = Column(String, nullable=True)
+    is_default = Column(Boolean, default=True)
+    status = Column(String, default="active")
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    scans = relationship("Scan", back_populates="cloud_account")
 
 class Scan(Base):
     __tablename__ = "scans"
 
     id = Column(Integer, primary_key=True, index=True)
+    cloud_account_id = Column(Integer, ForeignKey("cloud_accounts.id"), nullable=True)
     profile = Column(String, default="default")
     risk_score = Column(Integer, default=0)
     risk_level = Column(String, default="Low")
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
+    cloud_account = relationship("CloudAccount", back_populates="scans")
     findings = relationship("Finding", back_populates="scan")
 
 

@@ -84,7 +84,8 @@ export type ApiBundle = {
   activity: ActivityItem[];
   fixHistory: FixHistoryItem[];
   settings: Settings | null;
-  errors: Partial<Record<"latest" | "history" | "activity" | "fixHistory" | "settings", string>>;
+  cloudAccounts: CloudAccount[];
+  errors: Partial<Record<"latest" | "history" | "activity" | "fixHistory" | "settings" | "cloudAccounts", string>>;
 };
 
 export type FixResponse = {
@@ -103,4 +104,27 @@ export type AwsTestResponse = {
   [key: string]: unknown;
 };
 
-export type NavKey = "overview" | "findings" | "attack-paths" | "remediation" | "assets" | "activity" | "audit" | "integrations" | "settings" | "planned";
+export type NavKey =
+  | "overview"
+  | "findings"
+  | "attack-paths"
+  | "remediation"
+  | "assets"
+  | "activity"
+  | "audit"
+  | "integrations"
+  | "connect"
+  | "settings"
+  | "planned";
+
+  export type CloudAccount = {
+  id: number;
+  name: string;
+  provider?: string;
+  aws_account_id?: string | null;
+  aws_region?: string;
+  role_arn?: string | null;
+  is_default?: boolean;
+  status?: string;
+  created_at?: string;
+};

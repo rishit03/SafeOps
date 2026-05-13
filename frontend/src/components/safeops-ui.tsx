@@ -23,18 +23,21 @@ import {
 } from "lucide-react";
 import type { ApiBundle, NavKey, Settings } from "@/lib/types";
 import { cx, isValidSlackWebhook } from "@/lib/helpers";
+import { signOut } from "next-auth/react";
+import { useSafeOps } from "./safeops-data-provider";
 
 export const NAV_ITEMS: Array<{ key: NavKey; href: string; label: string; icon: ComponentType<{ className?: string }>; planned?: boolean }> = [
-  { key: "overview", href: "/", label: "Overview", icon: Gauge },
-  { key: "findings", href: "/findings", label: "Findings", icon: ShieldAlert },
-  { key: "attack-paths", href: "/attack-paths", label: "Attack paths", icon: GitBranch },
-  { key: "remediation", href: "/remediation", label: "Remediation", icon: Wrench },
-  { key: "assets", href: "/assets", label: "Assets", icon: Boxes },
-  { key: "activity", href: "/activity", label: "Activity", icon: Activity },
-  { key: "audit", href: "/audit", label: "Audit", icon: FileClock },
-  { key: "integrations", href: "/integrations", label: "Integrations", icon: CloudCog },
-  { key: "settings", href: "/settings", label: "Settings", icon: Settings2 },
-  { key: "planned", href: "/planned", label: "Roadmap", icon: Sparkles, planned: true },
+  { key: "overview", href: "/app", label: "Overview", icon: Gauge },
+  { key: "findings", href: "/app/findings", label: "Findings", icon: ShieldAlert },
+  { key: "attack-paths", href: "/app/attack-paths", label: "Attack paths", icon: GitBranch },
+  { key: "remediation", href: "/app/remediation", label: "Remediation", icon: Wrench },
+  { key: "assets", href: "/app/assets", label: "Assets", icon: Boxes },
+  { key: "activity", href: "/app/activity", label: "Activity", icon: Activity },
+  { key: "audit", href: "/app/audit", label: "Audit", icon: FileClock },
+  { key: "integrations", href: "/app/integrations", label: "Integrations", icon: CloudCog },
+  { key: "settings", href: "/app/settings", label: "Settings", icon: Settings2 },
+  { key: "planned", href: "/app/planned", label: "Roadmap", icon: Sparkles, planned: true },
+  { key: "connect", href: "/app/connect", label: "Connect AWS", icon: CloudCog },
 ];
 
 export function Badge({ children, tone = "tone-slate", className }: { children: ReactNode; tone?: string; className?: string }) {
@@ -127,12 +130,13 @@ export function SafeOpsShell({ bundle, active, children }: { bundle: ApiBundle; 
   const pathname = usePathname();
   const { awsReady, slackReady } = integrationStatus(bundle.settings);
   const activeItem = NAV_ITEMS.find((item) => item.key === active);
+  const { activeAccountId, setActiveAccountId } = useSafeOps();
 
   return (
     <main className="safeops-root">
       <div className="ambient-grid" aria-hidden="true" />
       <aside className="safeops-sidebar">
-        <Link href="/" className="brand-lockup" aria-label="SafeOps overview">
+        <Link href="/app" className="brand-lockup" aria-label="SafeOps overview">
           <span className="brand-mark"><ShieldCheck className="h-5 w-5" /></span>
           <span><strong>SafeOps</strong><small>Cloud posture</small></span>
         </Link>
@@ -148,10 +152,33 @@ export function SafeOpsShell({ bundle, active, children }: { bundle: ApiBundle; 
             );
           })}
         </nav>
-        <div className="sidebar-status">
-          <p className="eyebrow">Connections</p>
-          <div className="status-row"><span><CloudCog className="h-4 w-4" />AWS</span><Badge tone={awsReady ? "tone-green" : "tone-amber"}>{awsReady ? "Ready" : "Setup"}</Badge></div>
-          <div className="status-row"><span><MessageSquare className="h-4 w-4" />Slack</span><Badge tone={slackReady ? "tone-green" : "tone-slate"}>{slackReady ? "On" : "Off"}</Badge></div>
+        <div className="sidebar-footer">
+          <div className="sidebar-status">
+            <p className="eyebrow">Connections</p>
+
+            <div className="status-row">
+              <span><CloudCog className="h-4 w-4" />AWS</span>
+              <Badge tone={awsReady ? "tone-green" : "tone-amber"}>
+                {awsReady ? "Ready" : "Setup"}
+              </Badge>
+            </div>
+
+            <div className="status-row">
+              <span><MessageSquare className="h-4 w-4" />Slack</span>
+              <Badge tone={slackReady ? "tone-green" : "tone-slate"}>
+                {slackReady ? "On" : "Off"}
+              </Badge>
+            </div>
+          </div>
+
+          <div className="sidebar-logout">
+            <button
+              className="safeops-button safeops-button-secondary w-full"
+              onClick={() => signOut({ callbackUrl: "/login" })}
+            >
+              Log out
+            </button>
+          </div>
         </div>
       </aside>
       <div className="safeops-main">
@@ -161,8 +188,25 @@ export function SafeOpsShell({ bundle, active, children }: { bundle: ApiBundle; 
             <h2>Security command center</h2>
           </div>
           <div className="topbar-right">
+            <div className="account-switcher">
+              <select
+                value={activeAccountId || ""}
+                onChange={(event) => setActiveAccountId(Number(event.target.value))}
+              >
+                {bundle.cloudAccounts.length ? (
+                  bundle.cloudAccounts.map((account) => (
+                    <option key={account.id} value={account.id}>
+                      {account.name}
+                    </option>
+                  ))
+                ) : (
+                  <option value="">Default Account</option>
+                )}
+                <option disabled>+ Add account (soon)</option>
+              </select>
+            </div>
             <Badge tone="tone-cyan"><Radar className="h-3.5 w-3.5" /> Live backend</Badge>
-            <Link href="/integrations" className="support-link"><LifeBuoy className="h-4 w-4" /> Setup</Link>
+            <Link href="/app/integrations" className="support-link"><LifeBuoy className="h-4 w-4" /> Setup</Link>
           </div>
         </header>
         <div className="content-frame">{children}</div>

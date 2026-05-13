@@ -13,6 +13,7 @@ const emptyBundle: ApiBundle = {
   fixHistory: [],
   settings: null,
   errors: {},
+  cloudAccounts: [],
 };
 
 type SafeOpsContextValue = {
@@ -24,12 +25,14 @@ type SafeOpsContextValue = {
   fixingOne: string | null;
   saving: boolean;
   testingAws: boolean;
+  activeAccountId: number | null;
   refresh: () => Promise<void>;
   runScan: () => Promise<void>;
   fixFinding: (finding: Finding) => Promise<void>;
   fixCritical: () => Promise<void>;
   saveSettings: (settings: Settings) => Promise<void>;
   testAws: () => Promise<AwsTestResponse | null>;
+  setActiveAccountId: (id: number | null) => void;
 };
 
 const SafeOpsContext = createContext<SafeOpsContextValue | null>(null);
@@ -51,12 +54,17 @@ export function SafeOpsDataProvider({ children }: { children: ReactNode }) {
   const [fixingOne, setFixingOne] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [testingAws, setTestingAws] = useState(false);
+  const [activeAccountId, setActiveAccountId] = useState<number | null>(null);
 
   const refresh = useCallback(async () => {
     setRefreshing(true);
     try {
       const data = await loadSafeOpsBundle();
       setBundle(data);
+      if (data.cloudAccounts.length && !activeAccountId) {
+        const defaultAccount = data.cloudAccounts.find(a => a.is_default);
+        setActiveAccountId(defaultAccount?.id || data.cloudAccounts[0].id);
+      }
     } finally {
       setRefreshing(false);
       setLoading(false);
@@ -70,7 +78,7 @@ export function SafeOpsDataProvider({ children }: { children: ReactNode }) {
   const runScan = useCallback(async () => {
     setScanning(true);
     try {
-      const response = await safeopsApi.runScan();
+      const response = await safeopsApi.runScan(activeAccountId);
       const message = response && typeof response === "object" && "message" in response && typeof response.message === "string" ? response.message : undefined;
       toast.success(message || "Scan completed");
       if (!isValidSlackWebhook(bundle.settings?.slack_webhook_url)) toast("Add Slack to receive alerts.");
@@ -81,7 +89,7 @@ export function SafeOpsDataProvider({ children }: { children: ReactNode }) {
     } finally {
       setScanning(false);
     }
-  }, [bundle.settings?.slack_webhook_url, refresh]);
+  }, [activeAccountId, bundle.settings?.slack_webhook_url, refresh]);
 
   const fixFinding = useCallback(async (finding: Finding) => {
     if (!canAutoFix(finding)) {
@@ -154,12 +162,14 @@ export function SafeOpsDataProvider({ children }: { children: ReactNode }) {
     fixingOne,
     saving,
     testingAws,
+    activeAccountId,
     refresh,
     runScan,
     fixFinding,
     fixCritical,
     saveSettings,
     testAws,
+    setActiveAccountId,
   }), [bundle, loading, refreshing, scanning, fixingAll, fixingOne, saving, testingAws, refresh, runScan, fixFinding, fixCritical, saveSettings, testAws]);
 
   return <SafeOpsContext.Provider value={value}>{children}</SafeOpsContext.Provider>;

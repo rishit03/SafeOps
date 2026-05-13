@@ -180,6 +180,7 @@ function RiskChart() {
 }
 
 export function OverviewPage() {
+  const [showSetupComplete, setShowSetupComplete] = useState(true);
   const { bundle, fixCritical, fixingAll } = useSafeOps();
   const scan = bundle.latest;
   const findings = scan?.findings || [];
@@ -190,7 +191,13 @@ export function OverviewPage() {
   const lastScan = scanTimestamp(scan);
   const topFindings = highSignalFindings(findings).slice(0, 4);
 
-  if (!scan) {
+  const awsConnected = bundle.settings?.aws_connected;
+  const slackConfigured = bundle.settings?.slack_configured;
+  const hasScan = !!scan;
+
+  const setupComplete = awsConnected && slackConfigured && hasScan;
+
+  if (!hasScan) {
     return (
       <Frame active="overview">
         <PageHeader
@@ -210,6 +217,22 @@ export function OverviewPage() {
   return (
     <Frame active="overview">
       <PageHeader eyebrow="Overview" title="Cloud posture, simplified." description="A calm operating view for the risks that need action now." />
+      {setupComplete && showSetupComplete ? (
+        <Card className="setup-complete-banner">
+          <div>
+            <p className="eyebrow">Setup complete</p>
+            <h2>You're all set 🎉</h2>
+            <p>
+              AWS is connected, alerts are configured, and your first scan has completed.
+              SafeOps is now monitoring your cloud posture.
+            </p>
+          </div>
+
+          <Button variant="secondary" onClick={() => setShowSetupComplete(false)}>
+            Dismiss
+          </Button>
+        </Card>
+      ) : null}
       <section className="hero-grid">
         <Card className="hero-panel">
           <div className="hero-copy">
@@ -691,7 +714,7 @@ function OnboardingFlow() {
 
           <div className="onboarding-actions">
             <Button asChild variant="secondary">
-              <a href="/settings">Go to settings</a>
+              <a href="/app/settings">Go to settings</a>
             </Button>
 
             <Button
@@ -721,7 +744,7 @@ function OnboardingFlow() {
 
           <div className="onboarding-actions">
             <Button asChild variant="secondary">
-              <a href="/settings">Add Slack</a>
+              <a href="/app/settings">Add Slack</a>
             </Button>
           </div>
 

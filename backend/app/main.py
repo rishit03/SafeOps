@@ -69,6 +69,26 @@ app.include_router(router)
 
 @app.on_event("startup")
 def startup_event():
+    from app.database import SessionLocal
+    from app.models import CloudAccount
+
+    db = SessionLocal()
+
+    try:
+        existing = db.query(CloudAccount).first()
+
+        if not existing:
+            default_account = CloudAccount(
+                name="Default Account",
+                provider="aws",
+                is_default=True,
+            )
+            db.add(default_account)
+            db.commit()
+
+    finally:
+        db.close()
+
     start_scheduler()
 
 

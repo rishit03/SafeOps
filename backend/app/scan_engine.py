@@ -10,10 +10,11 @@ from safeops.alerts.slack import send_slack_alert
 from safeops.cloud.aws.iam_priv_esc_scanner import scan_iam_privilege_escalation
 from safeops.cloud.aws.attack_path_scanner import detect_attack_paths
 from safeops.engine.fix_prioritizer import classify_fix
+from app.models import CloudAccount
 
 
 
-def run_scan_and_store():
+def run_scan_and_store(account_id=None):
     db = SessionLocal()
 
     try:
@@ -80,10 +81,16 @@ def run_scan_and_store():
         else:
             risk_level = "Low"
 
+        if account_id:
+            account = db.query(CloudAccount).filter(CloudAccount.id == account_id).first()
+        else:
+            account = db.query(CloudAccount).filter(CloudAccount.is_default == True).first()
+
         scan = Scan(
             profile="default",
             risk_score=risk_score,
             risk_level=risk_level,
+            cloud_account_id=account.id if account else None,
         )
 
         db.add(scan)
