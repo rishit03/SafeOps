@@ -515,10 +515,20 @@ def get_asset_details(asset_id: int, db: Session = Depends(get_db)):
     if not asset:
         raise HTTPException(status_code=404, detail="Asset not found")
 
+    latest_scan = (
+        db.query(Scan)
+        .filter(Scan.cloud_account_id == asset.cloud_account_id)
+        .order_by(Scan.created_at.desc())
+        .first()
+    )
+
     findings = (
         db.query(Finding)
         .filter(Finding.asset_id == asset.id)
+        .filter(Finding.scan_id == latest_scan.id)
         .all()
+        if latest_scan
+        else []
     )
 
     outgoing = (
