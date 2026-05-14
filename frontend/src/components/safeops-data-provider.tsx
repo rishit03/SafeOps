@@ -116,7 +116,7 @@ export function SafeOpsDataProvider({ children }: { children: ReactNode }) {
     } finally {
       setScanning(false);
     }
-  }, [activeAccountId, bundle.settings?.slack_webhook_url, refresh]);
+  }, [activeAccountId, bundle.cloudAccounts, bundle.settings?.slack_webhook_url, refresh]);
 
   const fixFinding = useCallback(async (finding: Finding) => {
     if (!canAutoFix(finding)) {
