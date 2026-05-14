@@ -508,6 +508,64 @@ def get_graph(account_id: int, db: Session = Depends(get_db)):
         ],
     }
 
+@router.get("/api/assets/{asset_id}")
+def get_asset_details(asset_id: int, db: Session = Depends(get_db)):
+    asset = db.query(Asset).filter(Asset.id == asset_id).first()
+
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset not found")
+
+    findings = (
+        db.query(Finding)
+        .filter(Finding.asset_id == asset.id)
+        .all()
+    )
+
+    outgoing = (
+        db.query(AssetRelationship)
+        .filter(AssetRelationship.from_asset_id == asset.id)
+        .all()
+    )
+
+    incoming = (
+        db.query(AssetRelationship)
+        .filter(AssetRelationship.to_asset_id == asset.id)
+        .all()
+    )
+
+    return {
+        "asset": {
+            "id": asset.id,
+            "name": asset.name,
+            "type": asset.asset_type,
+        },
+        "findings": [
+            {
+                "id": finding.id,
+                "title": finding.title,
+                "severity": finding.severity,
+                "module": finding.module,
+            }
+            for finding in findings
+        ],
+        "relationships": {
+            "outgoing": [
+                {
+                    "target": rel.to_asset_id,
+                    "type": rel.relation_type,
+                }
+                for rel in outgoing
+            ],
+            "incoming": [
+                {
+                    "source": rel.from_asset_id,
+                    "type": rel.relation_type,
+                }
+                for rel in incoming
+            ],
+        },
+    }
+
 @router.post("/api/settings")
 def update_settings(payload: dict, db: Session = Depends(get_db)):
     settings = db.query(WorkspaceSettings).first()
