@@ -191,7 +191,11 @@ export function OverviewPage() {
   const lastScan = scanTimestamp(scan);
   const topFindings = highSignalFindings(findings).slice(0, 4);
 
-  const awsConnected = bundle.settings?.aws_connected === true;
+  const activeAccount = bundle.cloudAccounts.find(
+    (account) => account.id === activeAccountId
+  );
+
+  const awsConnected = Boolean(activeAccount?.role_arn || bundle.settings?.aws_connected);
   const slackConfigured = bundle.settings?.slack_configured;
   const hasScan = !!scan;
 
@@ -644,9 +648,13 @@ export function PlannedPage() {
 }
 
 function SetupProgress() {
-  const { bundle } = useSafeOps();
+  const { bundle, activeAccountId } = useSafeOps();
 
-  const awsConnected = bundle.settings?.aws_connected === true;
+  const activeAccount = bundle.cloudAccounts.find(
+    (account) => account.id === activeAccountId
+  );
+
+  const awsConnected = Boolean(activeAccount?.role_arn || bundle.settings?.aws_connected);
   const slackConfigured = bundle.settings?.slack_configured;
   const hasScan = !!bundle.latest;
 
@@ -691,9 +699,13 @@ function SetupProgress() {
 }
 
 function OnboardingFlow() {
-  const { bundle, runScan, testAws, testingAws } = useSafeOps();
+  const { bundle, runScan, testAws, testingAws, activeAccountId } = useSafeOps();
 
-  const awsConnected = bundle.settings?.aws_connected === true;
+  const activeAccount = bundle.cloudAccounts.find(
+    (account) => account.id === activeAccountId
+  );
+
+  const awsConnected = Boolean(activeAccount?.role_arn || bundle.settings?.aws_connected);
   const slackConfigured = bundle.settings?.slack_configured;
 
   return (
