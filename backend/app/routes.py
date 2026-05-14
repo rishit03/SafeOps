@@ -494,6 +494,23 @@ def get_graph(account_id: int, db: Session = Depends(get_db)):
                 "id": str(asset.id),
                 "label": asset.name,
                 "type": asset.asset_type,
+                "severity": (
+                    max(
+                        [
+                            finding.severity.lower()
+                            for finding in db.query(Finding)
+                            .filter(Finding.asset_id == asset.id)
+                            .all()
+                        ],
+                        default="low",
+                        key=lambda s: {
+                            "critical": 4,
+                            "high": 3,
+                            "medium": 2,
+                            "low": 1,
+                        }.get(s, 0),
+                    )
+                ),
             }
             for asset in assets
         ],

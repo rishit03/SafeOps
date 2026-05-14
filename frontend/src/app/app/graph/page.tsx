@@ -17,6 +17,7 @@ type GraphNode = {
   id: string;
   label: string;
   type: string;
+  severity: string;
 };
 
 type GraphEdge = {
@@ -77,6 +78,22 @@ function nodeStyle(type: string) {
   return base;
 }
 
+function severityGlow(severity: string) {
+  if (severity === "critical") {
+    return "0 0 40px rgba(248,113,113,.35)";
+  }
+
+  if (severity === "high") {
+    return "0 0 30px rgba(251,191,36,.25)";
+  }
+
+  if (severity === "medium") {
+    return "0 0 24px rgba(96,165,250,.18)";
+  }
+
+  return "none";
+}
+
 function layoutGraph(nodes: GraphNode[], edges: GraphEdge[]) {
   const dagreGraph = new dagre.graphlib.Graph();
 
@@ -109,19 +126,68 @@ function layoutGraph(nodes: GraphNode[], edges: GraphEdge[]) {
       targetPosition: Position.Left,
       data: {
         label: (
-          <div>
-            <div>{node.label}</div>
-            <div style={{ opacity: 0.65, fontSize: 12, marginTop: 8 }}>
-              {node.type}
+            <div>
+            <div
+                style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 10,
+                }}
+            >
+                <div
+                style={{
+                    fontSize: 18,
+                    fontWeight: 800,
+                }}
+                >
+                {node.label}
+                </div>
+
+                <div
+                style={{
+                    fontSize: 11,
+                    padding: "4px 8px",
+                    borderRadius: 999,
+                    background:
+                    node.severity === "critical"
+                        ? "rgba(127,29,29,.8)"
+                        : node.severity === "high"
+                        ? "rgba(120,53,15,.8)"
+                        : "rgba(15,23,42,.8)",
+                    border:
+                    node.severity === "critical"
+                        ? "1px solid rgba(248,113,113,.45)"
+                        : node.severity === "high"
+                        ? "1px solid rgba(251,191,36,.45)"
+                        : "1px solid rgba(148,163,184,.25)",
+                    textTransform: "uppercase",
+                    fontWeight: 700,
+                }}
+                >
+                {node.severity}
+                </div>
             </div>
-          </div>
+
+            <div
+                style={{
+                opacity: 0.65,
+                fontSize: 13,
+                }}
+            >
+                {node.type}
+            </div>
+            </div>
         ),
       },
       position: {
         x: position.x - NODE_WIDTH / 2,
         y: position.y - NODE_HEIGHT / 2,
       },
-      style: nodeStyle(node.type),
+      style: {
+        ...nodeStyle(node.type),
+        boxShadow: severityGlow(node.severity),
+        },
     };
   });
 
