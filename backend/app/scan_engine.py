@@ -264,6 +264,32 @@ def run_scan_and_store(account_id=None):
                     raw=f,
                 )
             )
+        
+        role_asset = (
+            db.query(Asset)
+            .filter(
+                Asset.cloud_account_id == account.id,
+                Asset.asset_type == "iam_role",
+            )
+            .first()
+        )
+
+        bucket_asset = (
+            db.query(Asset)
+            .filter(
+                Asset.cloud_account_id == account.id,
+                Asset.asset_type == "s3_bucket",
+            )
+            .first()
+        )
+
+        if role_asset and bucket_asset:
+            create_relationship(
+                db,
+                role_asset,
+                bucket_asset,
+                "can_access",
+            )
 
         db.commit()
 
