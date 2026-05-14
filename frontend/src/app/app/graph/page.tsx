@@ -152,6 +152,7 @@ export default function GraphPage() {
 
   const [nodes, setNodes] = useState<any[]>([]);
   const [edges, setEdges] = useState<any[]>([]);
+  const [selectedAsset, setSelectedAsset] = useState<any | null>(null);
 
   useEffect(() => {
     if (!activeAccountId) return;
@@ -172,11 +173,81 @@ export default function GraphPage() {
   }, [activeAccountId]);
 
   return (
-    <main style={{ height: "100vh", background: "#05070b" }}>
-      <ReactFlow nodes={nodes} edges={edges} fitView>
+    <main style={{ height: "100vh", background: "#05070b", position: "relative" }}>
+        <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        fitView
+        onNodeClick={async (_, node) => {
+            const details = await safeopsApi.assetDetails(Number(node.id));
+            setSelectedAsset(details);
+        }}
+        >
         <Background />
         <Controls />
-      </ReactFlow>
+        </ReactFlow>
+
+        {selectedAsset ? (
+        <div
+            style={{
+            position: "absolute",
+            top: 0,
+            right: 0,
+            width: 380,
+            height: "100%",
+            background: "#07101a",
+            borderLeft: "1px solid rgba(103,232,249,.18)",
+            padding: 24,
+            overflowY: "auto",
+            color: "#f8fafc",
+            zIndex: 10,
+            }}
+        >
+            <button
+            onClick={() => setSelectedAsset(null)}
+            style={{
+                marginBottom: 20,
+                background: "transparent",
+                color: "#67e8f9",
+                border: "none",
+                cursor: "pointer",
+            }}
+            >
+            Close
+            </button>
+
+            <h2>{selectedAsset.asset.name}</h2>
+            <p style={{ opacity: 0.7, marginBottom: 24 }}>
+            {selectedAsset.asset.type}
+            </p>
+
+            <h3>Findings</h3>
+
+            {selectedAsset.findings.length ? (
+            selectedAsset.findings.map((finding: any) => (
+                <div
+                key={finding.id}
+                style={{
+                    marginBottom: 16,
+                    padding: 14,
+                    borderRadius: 14,
+                    background: "rgba(255,255,255,.04)",
+                }}
+                >
+                <div style={{ fontWeight: 700, marginBottom: 8 }}>
+                    {finding.title}
+                </div>
+
+                <div style={{ opacity: 0.7, fontSize: 14 }}>
+                    {finding.severity}
+                </div>
+                </div>
+            ))
+            ) : (
+            <p>No findings</p>
+            )}
+        </div>
+        ) : null}
     </main>
-  );
+    );
 }

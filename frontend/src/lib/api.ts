@@ -71,6 +71,8 @@ export const safeopsApi = {
     request<{ nodes: unknown[]; edges: unknown[] }>(
       `/api/graph?account_id=${accountId}`
     ),
+  assetDetails: (assetId: number) =>
+    request(`/api/assets/${assetId}`),
 };
 
 export async function loadSafeOpsBundle(accountId?: number | null): Promise<ApiBundle> {
