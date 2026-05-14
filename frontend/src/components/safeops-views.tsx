@@ -195,7 +195,7 @@ export function OverviewPage() {
     (account) => account.id === activeAccountId
   );
 
-  const awsConnected = Boolean(activeAccount?.role_arn || bundle.settings?.aws_connected);
+  const awsConnected = activeAccount?.status === "connected";
   const slackConfigured = bundle.settings?.slack_configured;
   const hasScan = !!scan;
 
@@ -654,7 +654,7 @@ function SetupProgress() {
     (account) => account.id === activeAccountId
   );
 
-  const awsConnected = Boolean(activeAccount?.role_arn || bundle.settings?.aws_connected);
+  const awsConnected = activeAccount?.status === "connected";
   const slackConfigured = bundle.settings?.slack_configured;
   const hasScan = !!bundle.latest;
 
@@ -705,7 +705,7 @@ function OnboardingFlow() {
     (account) => account.id === activeAccountId
   );
 
-  const awsConnected = Boolean(activeAccount?.role_arn || bundle.settings?.aws_connected);
+  const awsConnected = activeAccount?.status === "connected";
   const slackConfigured = bundle.settings?.slack_configured;
 
   return (

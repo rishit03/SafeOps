@@ -61,7 +61,11 @@ export const safeopsApi = {
   fixHistory: () => request<FixHistoryItem[]>("/api/fix-history"),
   settings: () => request<Settings>("/api/settings"),
   saveSettings: (settings: Settings) => request<Settings>("/api/settings", { method: "POST", body: JSON.stringify(settings) }),
-  testAws: () => request<AwsTestResponse>("/api/settings/test-aws", { method: "POST" }),
+  testAws: (accountId?: number | null) =>
+    request<AwsTestResponse>("/api/settings/test-aws", {
+      method: "POST",
+      body: JSON.stringify({ account_id: accountId }),
+    }),
   cloudAccounts: () => request<CloudAccount[]>("/api/cloud-accounts"),
 };
 

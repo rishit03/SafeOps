@@ -158,11 +158,29 @@ export function SafeOpsDataProvider({ children }: { children: ReactNode }) {
 
   const testAws = useCallback(async () => {
     setTestingAws(true);
+
     try {
-      const response = await safeopsApi.testAws();
-      const responseRecord = response as AwsTestResponse & { success?: boolean; detail?: string };
-      if (responseRecord.ok || responseRecord.success || responseRecord.status === "success") toast.success(responseRecord.message || "AWS connection verified");
-      else toast.warning(responseRecord.message || responseRecord.detail || "AWS test returned a warning");
+      const response = await safeopsApi.testAws(activeAccountId);
+      const responseRecord = response as AwsTestResponse & {
+        success?: boolean;
+        detail?: string;
+      };
+
+      if (
+        responseRecord.ok ||
+        responseRecord.success ||
+        responseRecord.status === "success"
+      ) {
+        toast.success(responseRecord.message || "AWS connection verified");
+        await refresh();
+      } else {
+        toast.warning(
+          responseRecord.message ||
+            responseRecord.detail ||
+            "AWS test returned a warning"
+        );
+      }
+
       return response;
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "AWS test failed");
@@ -170,19 +188,19 @@ export function SafeOpsDataProvider({ children }: { children: ReactNode }) {
     } finally {
       setTestingAws(false);
     }
-  }, []);
+  }, [activeAccountId, refresh]);
 
-    const accountAwareBundle = useMemo(() => {
-      if (!activeAccountId) return bundle;
+  const accountAwareBundle = useMemo(() => {
+    if (!activeAccountId) return bundle;
 
-      const latestBelongsToActiveAccount =
-        bundle.latest?.cloud_account_id === activeAccountId;
+    const latestBelongsToActiveAccount =
+      bundle.latest?.cloud_account_id === activeAccountId;
 
-      return {
-        ...bundle,
-        latest: latestBelongsToActiveAccount ? bundle.latest : null,
-      };
-    }, [bundle, activeAccountId]);
+    return {
+      ...bundle,
+      latest: latestBelongsToActiveAccount ? bundle.latest : null,
+    };
+  }, [bundle, activeAccountId]);
 
   const value = useMemo<SafeOpsContextValue>(() => ({
     bundle: accountAwareBundle,

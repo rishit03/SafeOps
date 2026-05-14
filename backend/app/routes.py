@@ -490,23 +490,26 @@ def update_settings(payload: dict, db: Session = Depends(get_db)):
     return serialize_settings(settings)
 
 @router.post("/api/settings/test-aws")
-def test_aws_connection(db: Session = Depends(get_db)):
+def test_aws_connection(payload: dict = {}, db: Session = Depends(get_db)):
     import boto3
 
-    settings = db.query(WorkspaceSettings).first()
+    account_id = payload.get("account_id")
 
-    if not settings:
-        settings = WorkspaceSettings()
-        db.add(settings)
-        db.flush()
+    if account_id:
+        account = db.query(CloudAccount).filter(CloudAccount.id == account_id).first()
+    else:
+        account = db.query(CloudAccount).filter(CloudAccount.is_default == True).first()
+
+    if not account:
+        raise HTTPException(status_code=404, detail="Cloud account not found")
 
     try:
-        session = boto3.Session(region_name=settings.aws_region or "us-east-1")
+        session = boto3.Session(region_name=account.aws_region or "us-east-1")
 
-        if settings.role_arn:
+        if account.role_arn:
             sts = session.client("sts")
             assumed = sts.assume_role(
-                RoleArn=settings.role_arn,
+                RoleArn=account.role_arn,
                 RoleSessionName="safeops-test-session",
             )
 
@@ -516,12 +519,13 @@ def test_aws_connection(db: Session = Depends(get_db)):
                 aws_access_key_id=creds["AccessKeyId"],
                 aws_secret_access_key=creds["SecretAccessKey"],
                 aws_session_token=creds["SessionToken"],
-                region_name=settings.aws_region,
+                region_name=account.aws_region,
             )
 
         identity = session.client("sts").get_caller_identity()
 
-        settings.aws_connected = True
+        account.status = "connected"
+        account.aws_account_id = identity.get("Account")
         db.commit()
 
         return {
@@ -534,7 +538,7 @@ def test_aws_connection(db: Session = Depends(get_db)):
         }
 
     except Exception as e:
-        settings.aws_connected = False
+        account.status = "setup"
         db.commit()
 
         return {
@@ -552,8 +556,3 @@ def get_fix_history(db: Session = Depends(get_db)):
         .limit(20)
         .all()
     )
-
-@router.post("/api/scan/run")
-def run_scan(payload: dict = {}, db: Session = Depends(get_db)):
-    account_id = payload.get("account_id")
-    print("ACCOUNT ID RECEIVED:", account_id)
