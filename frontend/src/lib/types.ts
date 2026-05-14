@@ -116,7 +116,8 @@ export type NavKey =
   | "integrations"
   | "connect"
   | "settings"
-  | "planned";
+  | "planned"
+  | "graph";
 
   export type CloudAccount = {
   id: number;

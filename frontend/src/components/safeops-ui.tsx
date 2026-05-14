@@ -38,6 +38,7 @@ export const NAV_ITEMS: Array<{ key: NavKey; href: string; label: string; icon: 
   { key: "settings", href: "/app/settings", label: "Settings", icon: Settings2 },
   { key: "planned", href: "/app/planned", label: "Roadmap", icon: Sparkles, planned: true },
   { key: "connect", href: "/app/connect", label: "Connect AWS", icon: CloudCog },
+  { key: "graph", href: "/app/graph", label: "Security Graph", icon: GitBranch },
 ];
 
 export function Badge({ children, tone = "tone-slate", className }: { children: ReactNode; tone?: string; className?: string }) {

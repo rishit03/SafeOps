@@ -67,6 +67,10 @@ export const safeopsApi = {
       body: JSON.stringify({ account_id: accountId }),
     }),
   cloudAccounts: () => request<CloudAccount[]>("/api/cloud-accounts"),
+  graph: (accountId: number) =>
+    request<{ nodes: unknown[]; edges: unknown[] }>(
+      `/api/graph?account_id=${accountId}`
+    ),
 };
 
 export async function loadSafeOpsBundle(accountId?: number | null): Promise<ApiBundle> {
