@@ -5,13 +5,98 @@ from safeops.cloud.aws.iam_scanner import scan_publicly_assumable_roles
 import os
 
 from app.database import SessionLocal
-from app.models import Scan, Finding, WorkspaceSettings
+from app.models import Scan, Finding, WorkspaceSettings, Asset
 from safeops.alerts.slack import send_slack_alert
 from safeops.cloud.aws.iam_priv_esc_scanner import scan_iam_privilege_escalation
 from safeops.cloud.aws.attack_path_scanner import detect_attack_paths
 from safeops.engine.fix_prioritizer import classify_fix
 from app.models import CloudAccount
 
+
+
+def get_or_create_asset(db, cloud_account_id, asset_type, name, raw=None):
+    if not name:
+        return None
+
+    asset = (
+        db.query(Asset)
+        .filter(
+            Asset.cloud_account_id == cloud_account_id,
+            Asset.asset_type == asset_type,
+            Asset.name == str(name),
+        )
+        .first()
+    )
+
+    if asset:
+        return asset
+
+    asset = Asset(
+        cloud_account_id=cloud_account_id,
+        asset_id=str(name),
+        asset_type=asset_type,
+        name=str(name),
+        raw=raw or {},
+    )
+
+    db.add(asset)
+    db.flush()
+
+    return asset
+
+
+def asset_from_finding(db, account, finding):
+    if not account:
+        return None
+
+    raw = finding or {}
+
+    if raw.get("bucket_name"):
+        return get_or_create_asset(
+            db,
+            account.id,
+            "s3_bucket",
+            raw.get("bucket_name"),
+            raw,
+        )
+
+    if raw.get("role_name"):
+        return get_or_create_asset(
+            db,
+            account.id,
+            "iam_role",
+            raw.get("role_name"),
+            raw,
+        )
+
+    if raw.get("security_group_id"):
+        return get_or_create_asset(
+            db,
+            account.id,
+            "security_group",
+            raw.get("security_group_id"),
+            raw,
+        )
+
+    if raw.get("db_instance_identifier"):
+        return get_or_create_asset(
+            db,
+            account.id,
+            "rds_instance",
+            raw.get("db_instance_identifier"),
+            raw,
+        )
+
+    if raw.get("resource_id"):
+        return get_or_create_asset(
+            db,
+            account.id,
+            str(raw.get("resource_type") or "aws_resource"),
+            raw.get("resource_id"),
+            raw,
+        )
+
+    return None
 
 
 def run_scan_and_store(account_id=None):
@@ -114,9 +199,12 @@ def run_scan_and_store(account_id=None):
             f["fix_reason"] = fix_priority["reason"]
             f["recommended_action"] = fix_priority["recommended_action"]
 
+            asset = asset_from_finding(db, account, f)
+
             db.add(
                 Finding(
                     scan_id=scan.id,
+                    asset_id=asset.id if asset else None,
                     fingerprint=fingerprint,
                     title=title,
                     severity=f.get("severity"),

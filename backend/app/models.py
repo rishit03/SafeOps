@@ -19,6 +19,19 @@ class CloudAccount(Base):
 
     scans = relationship("Scan", back_populates="cloud_account")
 
+class Asset(Base):
+    __tablename__ = "assets"
+
+    id = Column(Integer, primary_key=True, index=True)
+    cloud_account_id = Column(Integer, ForeignKey("cloud_accounts.id"))
+
+    asset_id = Column(String, nullable=True)
+    asset_type = Column(String)
+    name = Column(String)
+    raw = Column(JSON)
+
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
 class Scan(Base):
     __tablename__ = "scans"
 
@@ -48,6 +61,9 @@ class Finding(Base):
     raw = Column(JSON)
 
     scan = relationship("Scan", back_populates="findings")
+    asset_id = Column(Integer, ForeignKey("assets.id"), nullable=True)
+
+    asset = relationship("Asset")
 
 class Activity(Base):
     __tablename__ = "activities"
@@ -84,3 +100,12 @@ class FixHistory(Base):
     after_risk_score = Column(Integer)
 
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+class AssetRelationship(Base):
+    __tablename__ = "asset_relationships"
+
+    id = Column(Integer, primary_key=True)
+    from_asset_id = Column(Integer, ForeignKey("assets.id"))
+    to_asset_id = Column(Integer, ForeignKey("assets.id"))
+
+    relation_type = Column(String)  # e.g. "can_assume", "exposes", "connects_to"
