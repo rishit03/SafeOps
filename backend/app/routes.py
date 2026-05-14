@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
-from app.models import Activity, Finding, Scan, FixHistory, WorkspaceSettings, CloudAccount
+from app.models import Activity, Finding, Scan, FixHistory, WorkspaceSettings, CloudAccount, Asset, AssetRelationship
 from app.schemas import ScanIn, ScanOut
 from app.scan_engine import run_scan_and_store
 
@@ -467,6 +467,46 @@ def get_cloud_accounts(db: Session = Depends(get_db)):
         for account in accounts
     ]
 
+@router.get("/api/graph")
+def get_graph(account_id: int, db: Session = Depends(get_db)):
+    assets = (
+        db.query(Asset)
+        .filter(Asset.cloud_account_id == account_id)
+        .all()
+    )
+
+    asset_ids = [asset.id for asset in assets]
+
+    relationships = (
+        db.query(AssetRelationship)
+        .filter(
+            AssetRelationship.from_asset_id.in_(asset_ids),
+            AssetRelationship.to_asset_id.in_(asset_ids),
+        )
+        .all()
+        if asset_ids
+        else []
+    )
+
+    return {
+        "nodes": [
+            {
+                "id": str(asset.id),
+                "label": asset.name,
+                "type": asset.asset_type,
+            }
+            for asset in assets
+        ],
+        "edges": [
+            {
+                "id": str(rel.id),
+                "source": str(rel.from_asset_id),
+                "target": str(rel.to_asset_id),
+                "type": rel.relation_type,
+            }
+            for rel in relationships
+        ],
+    }
 
 @router.post("/api/settings")
 def update_settings(payload: dict, db: Session = Depends(get_db)):
