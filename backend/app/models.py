@@ -109,3 +109,15 @@ class AssetRelationship(Base):
     to_asset_id = Column(Integer, ForeignKey("assets.id"))
 
     relation_type = Column(String)  # e.g. "can_assume", "exposes", "connects_to"
+
+class AssetRelationship(Base):
+    __tablename__ = "asset_relationships"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    from_asset_id = Column(Integer, ForeignKey("assets.id"))
+    to_asset_id = Column(Integer, ForeignKey("assets.id"))
+
+    relation_type = Column(String)
+
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))

@@ -5,7 +5,7 @@ from safeops.cloud.aws.iam_scanner import scan_publicly_assumable_roles
 import os
 
 from app.database import SessionLocal
-from app.models import Scan, Finding, WorkspaceSettings, Asset
+from app.models import Scan, Finding, WorkspaceSettings, Asset, AssetRelationship
 from safeops.alerts.slack import send_slack_alert
 from safeops.cloud.aws.iam_priv_esc_scanner import scan_iam_privilege_escalation
 from safeops.cloud.aws.attack_path_scanner import detect_attack_paths
@@ -98,6 +98,30 @@ def asset_from_finding(db, account, finding):
 
     return None
 
+def create_relationship(db, from_asset, to_asset, relation_type):
+    if not from_asset or not to_asset:
+        return
+
+    existing = (
+        db.query(AssetRelationship)
+        .filter(
+            AssetRelationship.from_asset_id == from_asset.id,
+            AssetRelationship.to_asset_id == to_asset.id,
+            AssetRelationship.relation_type == relation_type,
+        )
+        .first()
+    )
+
+    if existing:
+        return
+
+    db.add(
+        AssetRelationship(
+            from_asset_id=from_asset.id,
+            to_asset_id=to_asset.id,
+            relation_type=relation_type,
+        )
+    )
 
 def run_scan_and_store(account_id=None):
     db = SessionLocal()
@@ -134,6 +158,32 @@ def run_scan_and_store(account_id=None):
         attack_paths = detect_attack_paths(all_findings)
 
         all_findings.extend(attack_paths)
+
+        for finding in attack_paths:
+            role_name = finding.get("role_name")
+            bucket_name = finding.get("bucket_name")
+
+            if role_name and bucket_name:
+                role_asset = get_or_create_asset(
+                    db,
+                    account.id,
+                    "iam_role",
+                    role_name,
+                )
+
+                bucket_asset = get_or_create_asset(
+                    db,
+                    account.id,
+                    "s3_bucket",
+                    bucket_name,
+                )
+
+                create_relationship(
+                    db,
+                    role_asset,
+                    bucket_asset,
+                    "can_access",
+                )
 
         webhook_url = settings.slack_webhook_url if settings else None
 
