@@ -365,8 +365,23 @@ def fix_issue(payload: dict, db: Session = Depends(get_db)):
 @router.post("/api/scan/run")
 def run_scan(payload: dict = {}, db: Session = Depends(get_db)):
     account_id = payload.get("account_id")
+    account = None
+
+    if account_id:
+        account = db.query(CloudAccount).filter(CloudAccount.id == account_id).first()
+    else:
+        account = db.query(CloudAccount).filter(CloudAccount.is_default == True).first()
+
+    if not account:
+        raise HTTPException(status_code=404, detail="Cloud account not found")
+
+    if account.status != "connected":
+        raise HTTPException(
+            status_code=400,
+            detail="Test AWS connection before running a scan.",
+        )
     try:
-        result = run_scan_and_store(account_id=account_id)
+        result = run_scan_and_store(account_id=account.id)
 
         log_activity(
             db,

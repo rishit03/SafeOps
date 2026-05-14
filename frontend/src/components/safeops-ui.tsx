@@ -128,7 +128,16 @@ function integrationStatus(settings?: Settings | null) {
 
 export function SafeOpsShell({ bundle, active, children }: { bundle: ApiBundle; active: NavKey; children: ReactNode }) {
   const pathname = usePathname();
-  const { awsReady, slackReady } = integrationStatus(bundle.settings);
+  const activeAccount = bundle.cloudAccounts.find(
+    (account) => account.id === activeAccountId
+  );
+
+  const awsReady = activeAccount?.status === "connected";
+
+  const slackReady = Boolean(
+    isValidSlackWebhook(bundle.settings?.slack_webhook_url) ||
+    bundle.settings?.slack_configured
+  );
   const activeItem = NAV_ITEMS.find((item) => item.key === active);
   const { activeAccountId, setActiveAccountId } = useSafeOps();
 

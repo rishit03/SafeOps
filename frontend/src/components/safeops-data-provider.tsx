@@ -95,6 +95,14 @@ export function SafeOpsDataProvider({ children }: { children: ReactNode }) {
   }, [activeAccountId]);
 
   const runScan = useCallback(async () => {
+    const activeAccount = bundle.cloudAccounts.find(
+      (account) => account.id === activeAccountId
+    );
+
+    if (activeAccount?.status !== "connected") {
+      toast.warning("Test AWS connection before running a scan.");
+      return;
+    }
     setScanning(true);
     try {
       const response = await safeopsApi.runScan(activeAccountId);
