@@ -31,51 +31,62 @@ const NODE_WIDTH = 240;
 const NODE_HEIGHT = 100;
 
 function nodeStyle(type: string) {
-  const base = {
-    color: "#f8fafc",
-    borderRadius: 18,
-    padding: 14,
-    width: NODE_WIDTH,
-    minHeight: NODE_HEIGHT,
-    fontSize: 16,
-    fontWeight: 700,
-    border: "1px solid rgba(103,232,249,.25)",
-    background: "#07101a",
-  };
 
-  if (type === "iam_role") {
-    return {
-      ...base,
-      border: "1px solid rgba(196,181,253,.45)",
-      background: "linear-gradient(135deg, rgba(88,28,135,.35), rgba(15,23,42,.9))",
+    const base = {
+        color: "#f8fafc",
+        borderRadius: 18,
+        padding: 14,
+        width: NODE_WIDTH,
+        minHeight: NODE_HEIGHT,
+        fontSize: 16,
+        fontWeight: 700,
+        border: "1px solid rgba(103,232,249,.25)",
+        background: "#07101a",
     };
-  }
 
-  if (type === "s3_bucket") {
-    return {
-      ...base,
-      border: "1px solid rgba(103,232,249,.45)",
-      background: "linear-gradient(135deg, rgba(8,145,178,.28), rgba(15,23,42,.9))",
-    };
-  }
+    if (type === "internet") {
+        return {
+            ...base,
+            border: "1px solid rgba(248,113,113,.55)",
+            background:
+            "linear-gradient(135deg, rgba(127,29,29,.65), rgba(15,23,42,.95))",
+        };
+    }
+    
 
-  if (type === "security_group") {
-    return {
-      ...base,
-      border: "1px solid rgba(248,113,113,.45)",
-      background: "linear-gradient(135deg, rgba(127,29,29,.35), rgba(15,23,42,.9))",
-    };
-  }
+    if (type === "iam_role") {
+        return {
+        ...base,
+        border: "1px solid rgba(196,181,253,.45)",
+        background: "linear-gradient(135deg, rgba(88,28,135,.35), rgba(15,23,42,.9))",
+        };
+    }
 
-  if (type === "rds_instance") {
-    return {
-      ...base,
-      border: "1px solid rgba(251,146,60,.45)",
-      background: "linear-gradient(135deg, rgba(154,52,18,.35), rgba(15,23,42,.9))",
-    };
-  }
+    if (type === "s3_bucket") {
+        return {
+        ...base,
+        border: "1px solid rgba(103,232,249,.45)",
+        background: "linear-gradient(135deg, rgba(8,145,178,.28), rgba(15,23,42,.9))",
+        };
+    }
 
-  return base;
+    if (type === "security_group") {
+        return {
+        ...base,
+        border: "1px solid rgba(248,113,113,.45)",
+        background: "linear-gradient(135deg, rgba(127,29,29,.35), rgba(15,23,42,.9))",
+        };
+    }
+
+    if (type === "rds_instance") {
+        return {
+        ...base,
+        border: "1px solid rgba(251,146,60,.45)",
+        background: "linear-gradient(135deg, rgba(154,52,18,.35), rgba(15,23,42,.9))",
+        };
+    }
+
+    return base;
 }
 
 function severityGlow(severity: string) {
@@ -187,7 +198,7 @@ function layoutGraph(nodes: GraphNode[], edges: GraphEdge[]) {
       style: {
         ...nodeStyle(node.type),
         boxShadow: severityGlow(node.severity),
-        },
+      },
     };
   });
 

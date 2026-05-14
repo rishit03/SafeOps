@@ -488,8 +488,47 @@ def get_graph(account_id: int, db: Session = Depends(get_db)):
         else []
     )
 
+    internet_node_needed = False
+
+    extra_edges = []
+
+    for asset in assets:
+        findings = (
+            db.query(Finding)
+            .filter(Finding.asset_id == asset.id)
+            .all()
+        )
+
+        for finding in findings:
+            fingerprint = (finding.fingerprint or "").lower()
+
+            if (
+                "public" in fingerprint
+                or "security_group" in fingerprint
+                or "s3_public" in fingerprint
+            ):
+                internet_node_needed = True
+
+                extra_edges.append({
+                    "id": f"internet-{asset.id}",
+                    "source": "internet",
+                    "target": str(asset.id),
+                    "type": "public_access",
+                })
+
     return {
-        "nodes": [
+        "nodes": (
+            [
+                {
+                    "id": "internet",
+                    "label": "Internet",
+                    "type": "internet",
+                    "severity": "critical",
+                }
+            ]
+            if internet_node_needed
+            else []
+        ) + [
             {
                 "id": str(asset.id),
                 "label": asset.name,
@@ -514,7 +553,7 @@ def get_graph(account_id: int, db: Session = Depends(get_db)):
             }
             for asset in assets
         ],
-        "edges": [
+        "edges": extra_edges + [
             {
                 "id": str(rel.id),
                 "source": str(rel.from_asset_id),
