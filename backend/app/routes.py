@@ -103,6 +103,27 @@ def serialize_settings(settings: WorkspaceSettings):
         "created_at": settings.created_at.isoformat() if settings.created_at else None,
     }
 
+def compute_blast_radius(asset_id, relationships):
+    adjacency = {}
+
+    for rel in relationships:
+        adjacency.setdefault(
+            str(rel.from_asset_id),
+            []
+        ).append(str(rel.to_asset_id))
+
+    reachable = set()
+
+    def dfs(current):
+        for neighbor in adjacency.get(current, []):
+            if neighbor not in reachable:
+                reachable.add(neighbor)
+                dfs(neighbor)
+
+    dfs(str(asset_id))
+
+    return list(reachable)
+
 
 @router.post("/api/scans", response_model=ScanOut)
 def create_scan(scan_in: ScanIn, db: Session = Depends(get_db)):
@@ -784,6 +805,58 @@ def get_asset_details(asset_id: int, db: Session = Depends(get_db)):
                 for rel in incoming
             ],
         },
+    }
+
+@router.get("/api/blast-radius/{asset_id}")
+def get_blast_radius(asset_id: int, db: Session = Depends(get_db)):
+    asset = db.query(Asset).filter(Asset.id == asset_id).first()
+
+    if not asset:
+        raise HTTPException(status_code=404, detail="Asset not found")
+
+    relationships = db.query(AssetRelationship).all()
+
+    reachable_ids = compute_blast_radius(asset_id, relationships)
+
+    reachable_assets = (
+        db.query(Asset)
+        .filter(Asset.id.in_(reachable_ids))
+        .all()
+        if reachable_ids
+        else []
+    )
+
+    crown_jewels = []
+
+    for reachable_asset in reachable_assets:
+        name = (reachable_asset.name or "").lower()
+
+        if any(
+            keyword in name
+            for keyword in [
+                "prod",
+                "production",
+                "config",
+                "secret",
+                "backup",
+                "customer",
+                "pii",
+            ]
+        ):
+            crown_jewels.append(reachable_asset.name)
+
+    return {
+        "source_asset": asset.name,
+        "reachable_assets": [
+            {
+                "id": reachable_asset.id,
+                "name": reachable_asset.name,
+                "type": reachable_asset.asset_type,
+            }
+            for reachable_asset in reachable_assets
+        ],
+        "crown_jewels": crown_jewels,
+        "impact_score": min(100, len(reachable_assets) * 20),
     }
 
 @router.post("/api/settings")

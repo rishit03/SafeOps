@@ -79,6 +79,8 @@ export const safeopsApi = {
     }>(`/api/graph?account_id=${accountId}`),
   assetDetails: (assetId: number) =>
     request(`/api/assets/${assetId}`),
+  blastRadius: (assetId: number) =>
+    request(`/api/blast-radius/${assetId}`),
 };
 
 export async function loadSafeOpsBundle(accountId?: number | null): Promise<ApiBundle> {

@@ -310,6 +310,7 @@ export default function GraphPage() {
         nodes: GraphNode[];
         edges: GraphEdge[];
     }   | null>(null);
+    const [blastRadius, setBlastRadius] = useState<any | null>(null);
 
     useEffect(() => {
         if (!activeAccountId) return;
@@ -449,6 +450,62 @@ export default function GraphPage() {
                 ) : (
                 <p>No findings</p>
                 )}
+
+                <button
+                    onClick={async () => {
+                        const result = await safeopsApi.blastRadius(
+                        Number(selectedAsset.asset.id)
+                        );
+
+                        setBlastRadius(result);
+                    }}
+                    style={{
+                        marginTop: 20,
+                        padding: "10px 14px",
+                        borderRadius: 12,
+                        border: "1px solid rgba(103,232,249,.25)",
+                        background: "rgba(8,145,178,.2)",
+                        color: "#f8fafc",
+                        cursor: "pointer",
+                        fontWeight: 700,
+                    }}
+                    >
+                    Analyze Blast Radius
+                </button>
+
+                {blastRadius ? (
+                    <div
+                        style={{
+                        marginTop: 24,
+                        padding: 16,
+                        borderRadius: 14,
+                        background: "rgba(255,255,255,.04)",
+                        }}
+                    >
+                        <h3>Blast Radius</h3>
+
+                        <p>
+                        Reachable assets: {blastRadius.reachable_assets.length}
+                        </p>
+
+                        <p>
+                        Impact score: {blastRadius.impact_score}
+                        </p>
+
+                        {blastRadius.crown_jewels.length ? (
+                        <div style={{ marginTop: 12 }}>
+                            <strong>Crown jewels reachable:</strong>
+
+                            <ul>
+                            {blastRadius.crown_jewels.map((name: string) => (
+                                <li key={name}>{name}</li>
+                            ))}
+                            </ul>
+                        </div>
+                        ) : null}
+                    </div>
+                    ) : null}
+
             </div>
             ) : null}
         </main>
