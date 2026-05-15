@@ -506,7 +506,7 @@ def find_attack_paths(nodes, edges):
     return unique_paths
 
 def asset_criticality(asset, findings):
-    score = 10
+    score = 5
     crown_jewel = False
 
     asset_type = asset.asset_type or ""
@@ -520,51 +520,73 @@ def asset_criticality(asset, findings):
 
     if asset_type == "rds_instance":
         score += 30
-
-    if any(keyword in name for keyword in ["prod", "production", "config", "secret", "backup", "customer", "pii"]):
-        score += 30
         crown_jewel = True
 
-    for finding in findings:
-        severity = (finding.severity or "").lower()
+    if any(keyword in name for keyword in ["prod", "production", "config", "secret", "backup", "customer", "pii"]):
+        score += 24
+        crown_jewel = True
 
-        if severity == "critical":
-            score += 22
-        elif severity == "high":
-            score += 14
-        elif severity == "medium":
-            score += 6
+    severities = {(finding.severity or "").lower() for finding in findings}
+
+    if "critical" in severities:
+        score += 22
+    elif "high" in severities:
+        score += 14
+    elif "medium" in severities:
+        score += 6
 
     return {
-        "score": min(score, 100),
+        "score": min(score, 85),
         "crown_jewel": crown_jewel,
     }
 
 
 def score_attack_path(path, node_lookup):
-    score = 0
+    asset_scores = []
     crown_jewel_reached = False
+    has_critical = False
+    has_high = False
 
     for node_id in path:
+        if node_id == "internet":
+            continue
+
         node = node_lookup.get(node_id)
 
         if not node:
             continue
 
-        score = max(score, node.get("criticality_score", 0))
+        asset_scores.append(node.get("criticality_score", 0))
 
         if node.get("crown_jewel"):
             crown_jewel_reached = True
 
+        severity = (node.get("severity") or "").lower()
+
+        if severity == "critical":
+            has_critical = True
+        elif severity == "high":
+            has_high = True
+
+    score = max(asset_scores, default=0)
+
     if path and path[0] == "internet":
         score += 6
 
+    if has_critical:
+        score += 8
+    elif has_high:
+        score += 4
+
     if crown_jewel_reached:
-        score += 12
+        score += 10
+
+    if len(path) >= 3:
+        score += 6
 
     return {
         "path": path,
-        "score": min(score, 100),
+        "score": min(score, 95),
         "crown_jewel_reached": crown_jewel_reached,
     }
 
@@ -591,6 +613,7 @@ def get_graph(account_id: int, db: Session = Depends(get_db)):
 
     internet_node_needed = False
     extra_edges = []
+    extra_edge_ids = set()
 
     for asset in assets:
         findings = (
@@ -603,12 +626,17 @@ def get_graph(account_id: int, db: Session = Depends(get_db)):
             if finding.severity and finding.severity.lower() in ["critical", "high"]:
                 internet_node_needed = True
 
-                extra_edges.append({
-                    "id": f"internet-{asset.id}",
-                    "source": "internet",
-                    "target": str(asset.id),
-                    "type": "public_access",
-                })
+                edge_id = f"internet-{asset.id}"
+
+                if edge_id not in extra_edge_ids:
+                    extra_edge_ids.add(edge_id)
+
+                    extra_edges.append({
+                        "id": edge_id,
+                        "source": "internet",
+                        "target": str(asset.id),
+                        "type": "public_access",
+                    })
 
     graph_nodes = []
 
