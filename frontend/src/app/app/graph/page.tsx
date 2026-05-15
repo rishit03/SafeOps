@@ -90,117 +90,119 @@ function nodeStyle(type: string) {
 }
 
 function severityGlow(severity: string) {
-  if (severity === "critical") {
-    return "0 0 40px rgba(248,113,113,.35)";
-  }
+    if (severity === "critical") {
+        return "0 0 40px rgba(248,113,113,.35)";
+    }
 
-  if (severity === "high") {
-    return "0 0 30px rgba(251,191,36,.25)";
-  }
+    if (severity === "high") {
+        return "0 0 30px rgba(251,191,36,.25)";
+    }
 
-  if (severity === "medium") {
-    return "0 0 24px rgba(96,165,250,.18)";
-  }
+    if (severity === "medium") {
+        return "0 0 24px rgba(96,165,250,.18)";
+    }
 
-  return "none";
+    return "none";
 }
 
 function layoutGraph(nodes: GraphNode[], edges: GraphEdge[], activePath: string[]) {
-  const dagreGraph = new dagre.graphlib.Graph();
+    const dagreGraph = new dagre.graphlib.Graph();
 
-  dagreGraph.setDefaultEdgeLabel(() => ({}));
-  dagreGraph.setGraph({
-    rankdir: "LR",
-    nodesep: 80,
-    ranksep: 120,
-  });
-
-  nodes.forEach((node) => {
-    dagreGraph.setNode(node.id, {
-      width: NODE_WIDTH,
-      height: NODE_HEIGHT,
+    dagreGraph.setDefaultEdgeLabel(() => ({}));
+    dagreGraph.setGraph({
+        rankdir: "LR",
+        nodesep: 80,
+        ranksep: 120,
     });
-  });
 
-  edges.forEach((edge) => {
-    dagreGraph.setEdge(edge.source, edge.target);
-  });
+    nodes.forEach((node) => {
+        dagreGraph.setNode(node.id, {
+        width: NODE_WIDTH,
+        height: NODE_HEIGHT,
+        });
+    });
 
-  dagre.layout(dagreGraph);
+    edges.forEach((edge) => {
+        dagreGraph.setEdge(edge.source, edge.target);
+    });
 
-  const flowNodes = nodes.map((node) => {
+    dagre.layout(dagreGraph);
+
+    const flowNodes = nodes.map((node) => {
     const position = dagreGraph.node(node.id);
 
     return {
-      id: node.id,
-      sourcePosition: Position.Right,
-      targetPosition: Position.Left,
-      data: {
-        label: (
-            <div>
-            <div
-                style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: 10,
-                }}
-            >
+        id: node.id,
+        sourcePosition: Position.Right,
+        targetPosition: Position.Left,
+        data: {
+            label: (
+                <div>
                 <div
-                style={{
-                    fontSize: 18,
-                    fontWeight: 800,
-                }}
+                    style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: 10,
+                    }}
                 >
-                {node.label}
+                    <div
+                    style={{
+                        fontSize: 18,
+                        fontWeight: 800,
+                    }}
+                    >
+                    {node.label}
+                    </div>
+
+                    <div
+                    style={{
+                        fontSize: 11,
+                        padding: "4px 8px",
+                        borderRadius: 999,
+                        background:
+                        node.severity === "critical"
+                            ? "rgba(127,29,29,.8)"
+                            : node.severity === "high"
+                            ? "rgba(120,53,15,.8)"
+                            : "rgba(15,23,42,.8)",
+                        border:
+                        node.severity === "critical"
+                            ? "1px solid rgba(248,113,113,.45)"
+                            : node.severity === "high"
+                            ? "1px solid rgba(251,191,36,.45)"
+                            : "1px solid rgba(148,163,184,.25)",
+                        textTransform: "uppercase",
+                        fontWeight: 700,
+                    }}
+                    >
+                    {node.severity}
+                    </div>
                 </div>
 
                 <div
-                style={{
-                    fontSize: 11,
-                    padding: "4px 8px",
-                    borderRadius: 999,
-                    background:
-                    node.severity === "critical"
-                        ? "rgba(127,29,29,.8)"
-                        : node.severity === "high"
-                        ? "rgba(120,53,15,.8)"
-                        : "rgba(15,23,42,.8)",
-                    border:
-                    node.severity === "critical"
-                        ? "1px solid rgba(248,113,113,.45)"
-                        : node.severity === "high"
-                        ? "1px solid rgba(251,191,36,.45)"
-                        : "1px solid rgba(148,163,184,.25)",
-                    textTransform: "uppercase",
-                    fontWeight: 700,
-                }}
+                    style={{
+                    opacity: 0.65,
+                    fontSize: 13,
+                    }}
                 >
-                {node.severity}
+                    {node.type}
                 </div>
-            </div>
-
-            <div
-                style={{
-                opacity: 0.65,
-                fontSize: 13,
-                }}
-            >
-                {node.type}
-            </div>
-            </div>
-        ),
-      },
-      position: {
-        x: position.x - NODE_WIDTH / 2,
-        y: position.y - NODE_HEIGHT / 2,
-      },
-      style: {
+                </div>
+            ),
+        },
+        position: {
+            x: position.x - NODE_WIDTH / 2,
+            y: position.y - NODE_HEIGHT / 2,
+        },
+        style: {
         ...nodeStyle(node.type),
+        opacity: activePath.length === 0 || activePath.includes(node.id) ? 1 : 0.22,
+        filter: activePath.length === 0 || activePath.includes(node.id) ? "none" : "grayscale(80%)",
         boxShadow: activePath.includes(node.id)
             ? "0 0 50px rgba(103,232,249,.45)"
             : severityGlow(node.severity),
-      },
+        },
     };
   });
 
@@ -216,12 +218,21 @@ function layoutGraph(nodes: GraphNode[], edges: GraphEdge[], activePath: string[
         activePath.includes(edge.source) &&
         activePath.includes(edge.target),
     style: {
-      stroke:
-        activePath.includes(edge.source) &&
-        activePath.includes(edge.target)
+        stroke:
+            activePath.includes(edge.source) &&
+            activePath.includes(edge.target)
             ? "#67e8f9"
-            : "rgba(148,163,184,.25)",
-      strokeWidth: 2,
+            : "rgba(148,163,184,.18)",
+        strokeWidth:
+            activePath.includes(edge.source) &&
+            activePath.includes(edge.target)
+            ? 3
+            : 1.5,
+        opacity:
+            activePath.length === 0 ||
+            (activePath.includes(edge.source) && activePath.includes(edge.target))
+            ? 1
+            : 0.25,
     },
     labelStyle: {
       fill: "#bae6fd",
