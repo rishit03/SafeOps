@@ -482,10 +482,13 @@ def find_attack_paths(nodes, edges):
         visited.add(current)
         path.append(current)
 
-        if len(path) > 1:
+        neighbors = adjacency.get(current, [])
+
+        # only save completed attack chains
+        if not neighbors and len(path) > 1:
             paths.append(path.copy())
 
-        for neighbor in adjacency.get(current, []):
+        for neighbor in neighbors:
             dfs(neighbor, path, visited)
 
         path.pop()
@@ -493,7 +496,14 @@ def find_attack_paths(nodes, edges):
 
     dfs("internet", [], set())
 
-    return paths
+    # remove duplicates
+    unique_paths = []
+
+    for path in paths:
+        if path not in unique_paths:
+            unique_paths.append(path)
+
+    return unique_paths
 
 @router.get("/api/graph")
 def get_graph(account_id: int, db: Session = Depends(get_db)):
