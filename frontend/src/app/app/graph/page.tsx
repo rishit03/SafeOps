@@ -139,7 +139,13 @@ function severityGlow(severity: string) {
     return "none";
 }
 
-function layoutGraph(nodes: GraphNode[], edges: GraphEdge[], activePath: string[]) {
+function layoutGraph(
+    nodes: GraphNode[],
+    edges: GraphEdge[],
+    activePath: string[],
+    blastMode: boolean,
+    blastReachable: string[]
+) {
     const dagreGraph = new dagre.graphlib.Graph();
 
     dagreGraph.setDefaultEdgeLabel(() => ({}));
@@ -252,11 +258,28 @@ function layoutGraph(nodes: GraphNode[], edges: GraphEdge[], activePath: string[
         },
         style: {
         ...nodeStyle(node.type),
-        opacity: activePath.length === 0 || activePath.includes(node.id) ? 1 : 0.22,
-        filter: activePath.length === 0 || activePath.includes(node.id) ? "none" : "grayscale(80%)",
-        boxShadow: activePath.includes(node.id)
-            ? "0 0 50px rgba(103,232,249,.45)"
-            : severityGlow(node.severity),
+        opacity:
+            blastMode
+                ? blastReachable.includes(node.id)
+                ? 1
+                : 0.12
+                : activePath.length === 0 || activePath.includes(node.id)
+                ? 1
+                : 0.22,
+        filter:
+            blastMode
+                ? blastReachable.includes(node.id)
+                ? "none"
+                : "grayscale(100%)"
+                : activePath.length === 0 || activePath.includes(node.id)
+                ? "none"
+                : "grayscale(80%)",
+        boxShadow:
+            blastMode && blastReachable.includes(node.id)
+                ? "0 0 60px rgba(248,113,113,.35)"
+                : activePath.includes(node.id)
+                ? "0 0 50px rgba(103,232,249,.45)"
+                : severityGlow(node.severity),
         },
     };
   });
@@ -274,8 +297,13 @@ function layoutGraph(nodes: GraphNode[], edges: GraphEdge[], activePath: string[
         activePath.includes(edge.target),
     style: {
         stroke:
-            activePath.includes(edge.source) &&
-            activePath.includes(edge.target)
+            blastMode
+                ? blastReachable.includes(edge.source) &&
+                blastReachable.includes(edge.target)
+                ? edgeColor(edge.type)
+                : "rgba(148,163,184,.12)"
+                : activePath.includes(edge.source) &&
+                activePath.includes(edge.target)
             ? edgeColor(edge.type)
             : "rgba(148,163,184,.18)",
         strokeWidth:
@@ -284,7 +312,12 @@ function layoutGraph(nodes: GraphNode[], edges: GraphEdge[], activePath: string[
             ? 3
             : 1.5,
         opacity:
-            activePath.length === 0 ||
+            blastMode
+                ? blastReachable.includes(edge.source) &&
+                blastReachable.includes(edge.target)
+                ? 1
+                : 0.08
+                : activePath.length === 0 ||
             (activePath.includes(edge.source) && activePath.includes(edge.target))
             ? 1
             : 0.25,
@@ -311,6 +344,8 @@ export default function GraphPage() {
         edges: GraphEdge[];
     }   | null>(null);
     const [blastRadius, setBlastRadius] = useState<any | null>(null);
+    const [blastMode, setBlastMode] = useState(false);
+    const [blastReachable, setBlastReachable] = useState<string[]>([]);
 
     useEffect(() => {
         if (!activeAccountId) return;
@@ -339,12 +374,14 @@ export default function GraphPage() {
         const { flowNodes, flowEdges } = layoutGraph(
             graphData.nodes,
             graphData.edges,
-            activePath
+            activePath,
+            blastMode,
+            blastReachable
         );
 
         setNodes(flowNodes);
         setEdges(flowEdges);
-    }, [graphData, activePath]);
+    }, [graphData, activePath, blastMode, blastReachable]);
 
     return (
         <main style={{ height: "100vh", background: "#05070b", position: "relative" }}>
@@ -454,10 +491,19 @@ export default function GraphPage() {
                 <button
                     onClick={async () => {
                         const result = await safeopsApi.blastRadius(
-                        Number(selectedAsset.asset.id)
+                            Number(selectedAsset.asset.id)
                         );
 
                         setBlastRadius(result);
+
+                        setBlastMode(true);
+
+                        setBlastReachable([
+                            String(selectedAsset.asset.id),
+                            ...result.reachable_assets.map((asset: any) =>
+                            String(asset.id)
+                            ),
+                        ]);
                     }}
                     style={{
                         marginTop: 20,
@@ -471,6 +517,25 @@ export default function GraphPage() {
                     }}
                     >
                     Analyze Blast Radius
+                </button>
+
+                <button
+                    onClick={() => {
+                        setBlastMode(false);
+                        setBlastReachable([]);
+                    }}
+                    style={{
+                        marginTop: 10,
+                        padding: "10px 14px",
+                        borderRadius: 12,
+                        border: "1px solid rgba(248,113,113,.25)",
+                        background: "rgba(127,29,29,.2)",
+                        color: "#f8fafc",
+                        cursor: "pointer",
+                        fontWeight: 700,
+                    }}
+                    >
+                    Exit Blast Mode
                 </button>
 
                 {blastRadius ? (

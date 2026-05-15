@@ -1,4 +1,14 @@
 import type { ActivityItem, ApiBundle, AwsTestResponse, CloudAccount, FixHistoryItem, FixResponse, Scan, Settings } from "./types";
+export type BlastRadiusResponse = {
+  source_asset: string;
+  reachable_assets: Array<{
+    id: number;
+    name: string;
+    type: string;
+  }>;
+  crown_jewels: string[];
+  impact_score: number;
+};
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "";
 
@@ -80,7 +90,7 @@ export const safeopsApi = {
   assetDetails: (assetId: number) =>
     request(`/api/assets/${assetId}`),
   blastRadius: (assetId: number) =>
-    request(`/api/blast-radius/${assetId}`),
+    request<BlastRadiusResponse>(`/api/blast-radius/${assetId}`),
 };
 
 export async function loadSafeOpsBundle(accountId?: number | null): Promise<ApiBundle> {
