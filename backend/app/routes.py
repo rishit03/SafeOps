@@ -513,14 +513,13 @@ def asset_criticality(asset, findings):
     name = (asset.name or "").lower()
 
     if asset_type == "iam_role":
-        score += 30
+        score += 18
 
     if asset_type == "s3_bucket":
-        score += 25
+        score += 12
 
     if asset_type == "rds_instance":
-        score += 40
-        crown_jewel = True
+        score += 30
 
     if any(keyword in name for keyword in ["prod", "production", "config", "secret", "backup", "customer", "pii"]):
         score += 30
@@ -530,11 +529,11 @@ def asset_criticality(asset, findings):
         severity = (finding.severity or "").lower()
 
         if severity == "critical":
-            score += 35
+            score += 22
         elif severity == "high":
-            score += 25
+            score += 14
         elif severity == "medium":
-            score += 10
+            score += 6
 
     return {
         "score": min(score, 100),
@@ -558,10 +557,10 @@ def score_attack_path(path, node_lookup):
             crown_jewel_reached = True
 
     if path and path[0] == "internet":
-        score += 10
+        score += 6
 
     if crown_jewel_reached:
-        score += 15
+        score += 12
 
     return {
         "path": path,
