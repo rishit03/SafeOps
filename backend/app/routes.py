@@ -467,6 +467,34 @@ def get_cloud_accounts(db: Session = Depends(get_db)):
         for account in accounts
     ]
 
+def find_attack_paths(nodes, edges):
+    adjacency = {}
+
+    for edge in edges:
+        adjacency.setdefault(edge["source"], []).append(edge["target"])
+
+    paths = []
+
+    def dfs(current, path, visited):
+        if current in visited:
+            return
+
+        visited.add(current)
+        path.append(current)
+
+        if len(path) > 1:
+            paths.append(path.copy())
+
+        for neighbor in adjacency.get(current, []):
+            dfs(neighbor, path, visited)
+
+        path.pop()
+        visited.remove(current)
+
+    dfs("internet", [], set())
+
+    return paths
+
 @router.get("/api/graph")
 def get_graph(account_id: int, db: Session = Depends(get_db)):
     assets = (
@@ -489,7 +517,6 @@ def get_graph(account_id: int, db: Session = Depends(get_db)):
     )
 
     internet_node_needed = False
-
     extra_edges = []
 
     for asset in assets:
@@ -500,8 +527,6 @@ def get_graph(account_id: int, db: Session = Depends(get_db)):
         )
 
         for finding in findings:
-            fingerprint = (finding.fingerprint or "").lower()
-
             if finding.severity and finding.severity.lower() in ["critical", "high"]:
                 internet_node_needed = True
 
@@ -512,53 +537,60 @@ def get_graph(account_id: int, db: Session = Depends(get_db)):
                     "type": "public_access",
                 })
 
+    graph_nodes = (
+        [
+            {
+                "id": "internet",
+                "label": "Internet",
+                "type": "internet",
+                "severity": "critical",
+            }
+        ]
+        if internet_node_needed
+        else []
+    ) + [
+        {
+            "id": str(asset.id),
+            "label": asset.name,
+            "type": asset.asset_type,
+            "severity": max(
+                [
+                    finding.severity.lower()
+                    for finding in db.query(Finding)
+                    .filter(Finding.asset_id == asset.id)
+                    .all()
+                    if finding.severity
+                ],
+                default="low",
+                key=lambda severity: {
+                    "critical": 4,
+                    "high": 3,
+                    "medium": 2,
+                    "low": 1,
+                }.get(severity, 0),
+            ),
+        }
+        for asset in assets
+    ]
+
+    graph_edges = extra_edges + [
+        {
+            "id": str(rel.id),
+            "source": str(rel.from_asset_id),
+            "target": str(rel.to_asset_id),
+            "type": rel.relation_type,
+        }
+        for rel in relationships
+    ]
+
+    attack_paths = find_attack_paths(graph_nodes, graph_edges)
+
     return {
-        "nodes": (
-            [
-                {
-                    "id": "internet",
-                    "label": "Internet",
-                    "type": "internet",
-                    "severity": "critical",
-                }
-            ]
-            if internet_node_needed
-            else []
-        ) + [
-            {
-                "id": str(asset.id),
-                "label": asset.name,
-                "type": asset.asset_type,
-                "severity": (
-                    max(
-                        [
-                            finding.severity.lower()
-                            for finding in db.query(Finding)
-                            .filter(Finding.asset_id == asset.id)
-                            .all()
-                        ],
-                        default="low",
-                        key=lambda s: {
-                            "critical": 4,
-                            "high": 3,
-                            "medium": 2,
-                            "low": 1,
-                        }.get(s, 0),
-                    )
-                ),
-            }
-            for asset in assets
-        ],
-        "edges": extra_edges + [
-            {
-                "id": str(rel.id),
-                "source": str(rel.from_asset_id),
-                "target": str(rel.to_asset_id),
-                "type": rel.relation_type,
-            }
-            for rel in relationships
-        ],
+        "nodes": graph_nodes,
+        "edges": graph_edges,
+        "attack_paths": attack_paths,
     }
+
 
 @router.get("/api/assets/{asset_id}")
 def get_asset_details(asset_id: int, db: Session = Depends(get_db)):

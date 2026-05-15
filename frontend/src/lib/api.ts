@@ -68,9 +68,11 @@ export const safeopsApi = {
     }),
   cloudAccounts: () => request<CloudAccount[]>("/api/cloud-accounts"),
   graph: (accountId: number) =>
-    request<{ nodes: unknown[]; edges: unknown[] }>(
-      `/api/graph?account_id=${accountId}`
-    ),
+    request<{
+      nodes: unknown[];
+      edges: unknown[];
+      attack_paths?: string[][];
+    }>(`/api/graph?account_id=${accountId}`),
   assetDetails: (assetId: number) =>
     request(`/api/assets/${assetId}`),
 };
