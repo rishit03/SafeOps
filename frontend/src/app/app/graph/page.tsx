@@ -38,6 +38,16 @@ type GraphEdge = {
 const NODE_WIDTH = 240;
 const NODE_HEIGHT = 100;
 
+function nodeIcon(type: string) {
+    if (type === "internet") return "🌐";
+    if (type === "s3_bucket") return "🪣";
+    if (type === "iam_role") return "🔑";
+    if (type === "rds_instance") return "🗄️";
+    if (type === "security_group") return "🛡️";
+
+    return "☁️";
+}
+
 function nodeStyle(type: string) {
 
     const base = {
@@ -171,12 +181,16 @@ function layoutGraph(nodes: GraphNode[], edges: GraphEdge[], activePath: string[
                     }}
                 >
                     <div
-                    style={{
-                        fontSize: 18,
-                        fontWeight: 800,
-                    }}
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 10,
+                            fontSize: 18,
+                            fontWeight: 800,
+                        }}
                     >
-                    {node.label}
+                        <span>{nodeIcon(node.type)}</span>
+                        <span>{node.label}</span>
                     </div>
 
                     <div
