@@ -613,14 +613,16 @@ def get_graph(account_id: int, db: Session = Depends(get_db)):
     graph_nodes = []
 
     if internet_node_needed:
-        graph_nodes.append({
-            "id": "internet",
-            "label": "Internet",
-            "type": "internet",
-            "severity": "critical",
-            "criticality_score": 100,
-            "crown_jewel": False,
-        })
+        graph_nodes.append(
+            {
+                "id": "internet",
+                "label": "Internet",
+                "type": "internet",
+                "severity": "critical",
+                "criticality_score": 0,
+                "crown_jewel": False,
+            }
+        )
 
     for asset in assets:
         asset_findings = (
