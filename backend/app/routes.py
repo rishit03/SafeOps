@@ -502,11 +502,7 @@ def get_graph(account_id: int, db: Session = Depends(get_db)):
         for finding in findings:
             fingerprint = (finding.fingerprint or "").lower()
 
-            if (
-                "public" in fingerprint
-                or "security_group" in fingerprint
-                or "s3_public" in fingerprint
-            ):
+            if finding.severity and finding.severity.lower() in ["critical", "high"]:
                 internet_node_needed = True
 
                 extra_edges.append({
