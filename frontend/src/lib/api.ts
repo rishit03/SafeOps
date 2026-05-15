@@ -71,7 +71,11 @@ export const safeopsApi = {
     request<{
       nodes: unknown[];
       edges: unknown[];
-      attack_paths?: string[][];
+      attack_paths?: Array<{
+        path: string[];
+        score: number;
+        crown_jewel_reached: boolean;
+      }>;
     }>(`/api/graph?account_id=${accountId}`),
   assetDetails: (assetId: number) =>
     request(`/api/assets/${assetId}`),

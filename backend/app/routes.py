@@ -505,6 +505,70 @@ def find_attack_paths(nodes, edges):
 
     return unique_paths
 
+def asset_criticality(asset, findings):
+    score = 10
+    crown_jewel = False
+
+    asset_type = asset.asset_type or ""
+    name = (asset.name or "").lower()
+
+    if asset_type == "iam_role":
+        score += 30
+
+    if asset_type == "s3_bucket":
+        score += 25
+
+    if asset_type == "rds_instance":
+        score += 40
+        crown_jewel = True
+
+    if any(keyword in name for keyword in ["prod", "production", "config", "secret", "backup", "customer", "pii"]):
+        score += 30
+        crown_jewel = True
+
+    for finding in findings:
+        severity = (finding.severity or "").lower()
+
+        if severity == "critical":
+            score += 35
+        elif severity == "high":
+            score += 25
+        elif severity == "medium":
+            score += 10
+
+    return {
+        "score": min(score, 100),
+        "crown_jewel": crown_jewel,
+    }
+
+
+def score_attack_path(path, node_lookup):
+    score = 0
+    crown_jewel_reached = False
+
+    for node_id in path:
+        node = node_lookup.get(node_id)
+
+        if not node:
+            continue
+
+        score = max(score, node.get("criticality_score", 0))
+
+        if node.get("crown_jewel"):
+            crown_jewel_reached = True
+
+    if path and path[0] == "internet":
+        score += 10
+
+    if crown_jewel_reached:
+        score += 15
+
+    return {
+        "path": path,
+        "score": min(score, 100),
+        "crown_jewel_reached": crown_jewel_reached,
+    }
+
 @router.get("/api/graph")
 def get_graph(account_id: int, db: Session = Depends(get_db)):
     assets = (
@@ -547,41 +611,50 @@ def get_graph(account_id: int, db: Session = Depends(get_db)):
                     "type": "public_access",
                 })
 
-    graph_nodes = (
-        [
-            {
-                "id": "internet",
-                "label": "Internet",
-                "type": "internet",
-                "severity": "critical",
-            }
-        ]
-        if internet_node_needed
-        else []
-    ) + [
-        {
+    graph_nodes = []
+
+    if internet_node_needed:
+        graph_nodes.append({
+            "id": "internet",
+            "label": "Internet",
+            "type": "internet",
+            "severity": "critical",
+            "criticality_score": 100,
+            "crown_jewel": False,
+        })
+
+    for asset in assets:
+        asset_findings = (
+            db.query(Finding)
+            .filter(Finding.asset_id == asset.id)
+            .all()
+        )
+
+        severity = max(
+            [
+                finding.severity.lower()
+                for finding in asset_findings
+                if finding.severity
+            ],
+            default="low",
+            key=lambda severity: {
+                "critical": 4,
+                "high": 3,
+                "medium": 2,
+                "low": 1,
+            }.get(severity, 0),
+        )
+
+        criticality = asset_criticality(asset, asset_findings)
+
+        graph_nodes.append({
             "id": str(asset.id),
             "label": asset.name,
             "type": asset.asset_type,
-            "severity": max(
-                [
-                    finding.severity.lower()
-                    for finding in db.query(Finding)
-                    .filter(Finding.asset_id == asset.id)
-                    .all()
-                    if finding.severity
-                ],
-                default="low",
-                key=lambda severity: {
-                    "critical": 4,
-                    "high": 3,
-                    "medium": 2,
-                    "low": 1,
-                }.get(severity, 0),
-            ),
-        }
-        for asset in assets
-    ]
+            "severity": severity,
+            "criticality_score": criticality["score"],
+            "crown_jewel": criticality["crown_jewel"],
+        })
 
     graph_edges = extra_edges + [
         {
@@ -593,7 +666,21 @@ def get_graph(account_id: int, db: Session = Depends(get_db)):
         for rel in relationships
     ]
 
-    attack_paths = find_attack_paths(graph_nodes, graph_edges)
+    raw_paths = find_attack_paths(graph_nodes, graph_edges)
+
+    node_lookup = {
+        node["id"]: node
+        for node in graph_nodes
+    }
+
+    attack_paths = sorted(
+        [
+            score_attack_path(path, node_lookup)
+            for path in raw_paths
+        ],
+        key=lambda item: item["score"],
+        reverse=True,
+    )
 
     return {
         "nodes": graph_nodes,

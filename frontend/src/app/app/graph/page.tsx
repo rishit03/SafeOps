@@ -14,10 +14,18 @@ import { useSafeOps } from "@/components/safeops-data-provider";
 import { safeopsApi } from "@/lib/api";
 
 type GraphNode = {
-  id: string;
-  label: string;
-  type: string;
-  severity: string;
+    id: string;
+    label: string;
+    type: string;
+    severity: string;
+    criticality_score?: number;
+    crown_jewel?: boolean;
+};
+
+type AttackPath = {
+    path: string[];
+    score: number;
+    crown_jewel_reached: boolean;
 };
 
 type GraphEdge = {
@@ -177,6 +185,23 @@ function layoutGraph(nodes: GraphNode[], edges: GraphEdge[], activePath: string[
                     }}
                     >
                     {node.severity}
+                    {node.crown_jewel ? (
+                        <div
+                            style={{
+                            fontSize: 10,
+                            padding: "4px 8px",
+                            borderRadius: 999,
+                            background: "rgba(251,191,36,.18)",
+                            border: "1px solid rgba(251,191,36,.45)",
+                            textTransform: "uppercase",
+                            fontWeight: 800,
+                            marginTop: 6,
+                            color: "#fde68a",
+                            }}
+                        >
+                            Crown jewel
+                        </div>
+                        ) : null}
                     </div>
                 </div>
 
@@ -249,7 +274,7 @@ export default function GraphPage() {
     const [nodes, setNodes] = useState<any[]>([]);
     const [edges, setEdges] = useState<any[]>([]);
     const [selectedAsset, setSelectedAsset] = useState<any | null>(null);
-    const [attackPaths, setAttackPaths] = useState<string[][]>([]);
+    const [attackPaths, setAttackPaths] = useState<AttackPath[]>([]);
     const [activePath, setActivePath] = useState<string[]>([]);
     const [graphData, setGraphData] = useState<{
         nodes: GraphNode[];
@@ -262,8 +287,8 @@ export default function GraphPage() {
         async function loadGraph() {
             const graph = await safeopsApi.graph(activeAccountId as number);
 
-            const paths = graph.attack_paths || [];
-            const firstPath = paths[0] || [];
+            const paths = (graph.attack_paths || []) as AttackPath[];
+            const firstPath = paths[0]?.path || [];
 
             setAttackPaths(paths);
             setActivePath(firstPath);
@@ -305,20 +330,20 @@ export default function GraphPage() {
                 {attackPaths.map((path, index) => (
                     <button
                     key={index}
-                    onClick={() => setActivePath(path)}
+                    onClick={() => setActivePath(path.path)}
                     style={{
                         padding: "8px 14px",
                         borderRadius: 999,
                         border: "1px solid rgba(103,232,249,.25)",
                         background:
-                        activePath === path
+                        activePath.join(",") === path.path.join(",")
                             ? "rgba(8,145,178,.3)"
                             : "rgba(15,23,42,.8)",
                         color: "#f8fafc",
                         cursor: "pointer",
                     }}
                     >
-                    Path {index + 1}
+                    Path {index + 1} · {path.score}
                     </button>
                 ))}
                 </div>
