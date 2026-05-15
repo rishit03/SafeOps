@@ -97,6 +97,22 @@ function nodeStyle(type: string) {
     return base;
 }
 
+function edgeColor(type: string) {
+    if (type === "public_access") {
+        return "#f87171";
+    }
+
+    if (type === "can_access") {
+        return "#67e8f9";
+    }
+
+    if (type === "can_assume") {
+        return "#c4b5fd";
+    }
+
+    return "rgba(148,163,184,.35)";
+}
+
 function severityGlow(severity: string) {
     if (severity === "critical") {
         return "0 0 40px rgba(248,113,113,.35)";
@@ -246,7 +262,7 @@ function layoutGraph(nodes: GraphNode[], edges: GraphEdge[], activePath: string[
         stroke:
             activePath.includes(edge.source) &&
             activePath.includes(edge.target)
-            ? "#67e8f9"
+            ? edgeColor(edge.type)
             : "rgba(148,163,184,.18)",
         strokeWidth:
             activePath.includes(edge.source) &&
@@ -260,8 +276,8 @@ function layoutGraph(nodes: GraphNode[], edges: GraphEdge[], activePath: string[
             : 0.25,
     },
     labelStyle: {
-      fill: "#bae6fd",
-      fontWeight: 700,
+        fill: edgeColor(edge.type),
+        fontWeight: 800,
     },
   }));
 
