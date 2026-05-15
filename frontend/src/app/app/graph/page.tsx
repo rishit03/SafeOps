@@ -251,31 +251,44 @@ export default function GraphPage() {
     const [selectedAsset, setSelectedAsset] = useState<any | null>(null);
     const [attackPaths, setAttackPaths] = useState<string[][]>([]);
     const [activePath, setActivePath] = useState<string[]>([]);
+    const [graphData, setGraphData] = useState<{
+        nodes: GraphNode[];
+        edges: GraphEdge[];
+    }   | null>(null);
 
     useEffect(() => {
         if (!activeAccountId) return;
 
         async function loadGraph() {
-        const graph = await safeopsApi.graph(activeAccountId as number);
+            const graph = await safeopsApi.graph(activeAccountId as number);
 
-        const paths = graph.attack_paths || [];
-        const firstPath = paths[0] || [];
+            const paths = graph.attack_paths || [];
+            const firstPath = paths[0] || [];
 
-        setAttackPaths(paths);
-        setActivePath(firstPath);
+            setAttackPaths(paths);
+            setActivePath(firstPath);
 
-        const { flowNodes, flowEdges } = layoutGraph(
-            graph.nodes as GraphNode[],
-            graph.edges as GraphEdge[],
-            firstPath
-        );
-
-        setNodes(flowNodes);
-        setEdges(flowEdges);
+            setGraphData({
+            nodes: graph.nodes as GraphNode[],
+            edges: graph.edges as GraphEdge[],
+            });
         }
 
         loadGraph();
     }, [activeAccountId]);
+
+    useEffect(() => {
+        if (!graphData) return;
+
+        const { flowNodes, flowEdges } = layoutGraph(
+            graphData.nodes,
+            graphData.edges,
+            activePath
+        );
+
+        setNodes(flowNodes);
+        setEdges(flowEdges);
+    }, [graphData, activePath]);
 
     return (
         <main style={{ height: "100vh", background: "#05070b", position: "relative" }}>
