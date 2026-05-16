@@ -495,6 +495,11 @@ export default function GraphPage() {
                 )
                 )
             : [];
+    const crownJewelGroups =
+        (blastRadius?.crown_jewel_groups || {}) as Record<
+            string,
+            Array<{ id: number; name: string; type: string }>
+        >;
     const [analysisCollapsed, setAnalysisCollapsed] = useState(false);
     const [hoveredEdge, setHoveredEdge] = useState<any | null>(null);
     const [searchQuery, setSearchQuery] = useState("");
@@ -1032,30 +1037,29 @@ export default function GraphPage() {
                                 gap: 14,
                             }}
                             >
-                            {Object.entries(blastRadius.crown_jewel_groups || {}).map(
-                                ([category, assets]) => (
-                                <div key={category}>
-                                    <div
-                                    style={{
-                                        fontSize: 12,
-                                        textTransform: "uppercase",
-                                        letterSpacing: "0.1em",
-                                        color: "#fde68a",
-                                        fontWeight: 800,
-                                        marginBottom: 6,
-                                    }}
-                                    >
-                                    {category}
-                                    </div>
+                            {Object.entries(crownJewelGroups).map(([category, assets]) => (
+                                    <div key={category}>
+                                        <div
+                                        style={{
+                                            fontSize: 12,
+                                            textTransform: "uppercase",
+                                            letterSpacing: "0.1em",
+                                            color: "#fde68a",
+                                            fontWeight: 800,
+                                            marginBottom: 6,
+                                        }}
+                                        >
+                                        {category}
+                                        </div>
 
-                                    <ul style={{ margin: 0, paddingLeft: 18 }}>
-                                    {assets.map((asset) => (
-                                        <li key={asset.id}>
-                                        {asset.name}
-                                        </li>
-                                    ))}
-                                    </ul>
-                                </div>
+                                        <ul style={{ margin: 0, paddingLeft: 18 }}>
+                                        {assets.map((asset) => (
+                                            <li key={asset.id}>
+                                            {asset.name}
+                                            </li>
+                                        ))}
+                                        </ul>
+                                    </div>
                                 )
                             )}
                             </div>
