@@ -927,6 +927,66 @@ def get_asset_details(asset_id: int, db: Session = Depends(get_db)):
         },
     }
 
+@router.get("/api/findings/{finding_id}/intelligence")
+def get_finding_intelligence(finding_id: int, db: Session = Depends(get_db)):
+    finding = db.query(Finding).filter(Finding.id == finding_id).first()
+
+    if not finding:
+        raise HTTPException(status_code=404, detail="Finding not found")
+
+    asset = db.query(Asset).filter(Asset.id == finding.asset_id).first() if finding.asset_id else None
+
+    reachable_assets = []
+    crown_jewels = []
+    impact_score = 0
+
+    if asset:
+        relationships = db.query(AssetRelationship).all()
+        reachable_ids = compute_blast_radius(asset.id, relationships)
+
+        reachable_assets = (
+            db.query(Asset)
+            .filter(Asset.id.in_(reachable_ids))
+            .all()
+            if reachable_ids
+            else []
+        )
+
+        for reachable_asset in reachable_assets:
+            name = (reachable_asset.name or "").lower()
+
+            if any(
+                keyword in name
+                for keyword in [
+                    "prod",
+                    "production",
+                    "config",
+                    "secret",
+                    "backup",
+                    "customer",
+                    "pii",
+                ]
+            ):
+                crown_jewels.append(reachable_asset.name)
+
+        impact_score = min(
+            100,
+            (len(reachable_assets) * 12) + (len(crown_jewels) * 25),
+        )
+
+    return {
+        "finding_id": finding.id,
+        "asset": {
+            "id": asset.id,
+            "name": asset.name,
+            "type": asset.asset_type,
+        } if asset else None,
+        "reachable_asset_count": len(reachable_assets),
+        "crown_jewel_count": len(crown_jewels),
+        "crown_jewels": crown_jewels,
+        "impact_score": impact_score,
+    }
+
 @router.get("/api/blast-radius/{asset_id}")
 def get_blast_radius(asset_id: int, db: Session = Depends(get_db)):
     asset = db.query(Asset).filter(Asset.id == asset_id).first()
