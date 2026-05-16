@@ -916,6 +916,7 @@ def get_blast_radius(asset_id: int, db: Session = Depends(get_db)):
 
     return {
         "source_asset": asset.name,
+
         "reachable_assets": [
             {
                 "id": reachable_asset.id,
@@ -924,8 +925,18 @@ def get_blast_radius(asset_id: int, db: Session = Depends(get_db)):
             }
             for reachable_asset in reachable_assets
         ],
+
+        "reachable_asset_count": len(reachable_assets),
+
         "crown_jewels": crown_jewels,
-        "impact_score": min(100, len(reachable_assets) * 20),
+
+        "crown_jewel_count": len(crown_jewels),
+
+        "impact_score": min(
+            100,
+            (len(reachable_assets) * 12)
+            + (len(crown_jewels) * 25)
+        ),
     }
 
 @router.post("/api/settings")

@@ -1,12 +1,19 @@
 import type { ActivityItem, ApiBundle, AwsTestResponse, CloudAccount, FixHistoryItem, FixResponse, Scan, Settings } from "./types";
 export type BlastRadiusResponse = {
   source_asset: string;
+
   reachable_assets: Array<{
     id: number;
     name: string;
     type: string;
   }>;
+
+  reachable_asset_count: number;
+
   crown_jewels: string[];
+
+  crown_jewel_count: number;
+
   impact_score: number;
 };
 

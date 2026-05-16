@@ -766,11 +766,15 @@ export default function GraphPage() {
                         <h3>Blast Radius</h3>
 
                         <p>
-                        Reachable assets: {blastRadius.reachable_assets.length}
+                            Reachable assets: {blastRadius.reachable_asset_count}
                         </p>
 
                         <p>
-                        Impact score: {blastRadius.impact_score}
+                            Crown jewels exposed: {blastRadius.crown_jewel_count}
+                        </p>
+
+                        <p>
+                            Impact score: {blastRadius.impact_score}
                         </p>
 
                         {blastRadius.crown_jewels.length ? (
