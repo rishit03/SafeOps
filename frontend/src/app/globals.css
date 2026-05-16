@@ -619,3 +619,31 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   padding: 6px 10px;
   border-radius: 10px;
 }
+
+.finding-intelligence {
+  margin-top: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.finding-intelligence div {
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.finding-intelligence strong {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 12px;
+  color: #67e8f9;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.finding-intelligence span {
+  display: block;
+  color: var(--muted);
+  line-height: 1.5;
+}

@@ -118,25 +118,85 @@ function FindingRow({ finding, compact = false }: { finding: Finding; compact?: 
   const fixable = canAutoFix(finding);
   const busy = fixingOne === fingerprint;
 
+  const isCrownJewelRelated =
+    String(finding.raw?.bucket_name || "").toLowerCase().includes("config") ||
+    String(finding.raw?.bucket_name || "").toLowerCase().includes("secret") ||
+    String(finding.raw?.bucket_name || "").toLowerCase().includes("prod") ||
+    String(finding.raw?.bucket_name || "").toLowerCase().includes("customer");
+
+  const hasPrivEsc =
+    String(finding.fingerprint || finding.raw?.fingerprint || "").toLowerCase().includes("priv") ||
+    String(finding.title || "").toLowerCase().includes("privilege");
+
   return (
     <Card className={cx("finding-row", compact && "finding-row-compact")}>
       <div className={cx("priority-strip", fixPriorityTone(finding.raw?.fix_priority))} />
+
       <div className="finding-main">
         <div className="finding-leading">
-          <Badge tone={severityTone(finding.severity)}>{finding.severity || "unknown"}</Badge>
-          <Badge tone={fixPriorityTone(finding.raw?.fix_priority)}>{fixPriorityLabel(finding.raw?.fix_priority)}</Badge>
+          <Badge tone={severityTone(finding.severity)}>
+            {finding.severity || "unknown"}
+          </Badge>
+
+          <Badge tone={fixPriorityTone(finding.raw?.fix_priority)}>
+            {fixPriorityLabel(finding.raw?.fix_priority)}
+          </Badge>
+
+          {!compact && isCrownJewelRelated ? (
+            <Badge tone="tone-amber">Crown jewel related</Badge>
+          ) : null}
+
+          {!compact && hasPrivEsc ? (
+            <Badge tone="tone-red">Privilege path</Badge>
+          ) : null}
         </div>
-        <h3><FindingTitle finding={finding} /></h3>
-        <p><FindingMeta finding={finding} /></p>
-        {!compact && finding.raw?.why_it_matters ? <small>{finding.raw.why_it_matters}</small> : null}
-        {!compact && finding.raw?.recommended_action ? (
-          <small className="finding-recommended-action">
-            Action: {finding.raw.recommended_action}
-          </small>
+
+        <h3>
+          <FindingTitle finding={finding} />
+        </h3>
+
+        <p>
+          <FindingMeta finding={finding} />
+        </p>
+
+        {!compact ? (
+          <div className="finding-intelligence">
+            <div>
+              <strong>Why this matters</strong>
+              <span>
+                {finding.raw?.why_it_matters ||
+                  "This finding may increase cloud exposure or contribute to an attack path."}
+              </span>
+            </div>
+
+            <div>
+              <strong>Graph context</strong>
+              <span>
+                {hasPrivEsc
+                  ? "This identity-related finding may enable privilege escalation or downstream access."
+                  : isCrownJewelRelated
+                  ? "This asset appears to be business-critical or sensitive based on naming context."
+                  : "SafeOps will use asset relationships to determine downstream impact."}
+              </span>
+            </div>
+
+            <div>
+              <strong>Recommended action</strong>
+              <span>
+                {finding.raw?.recommended_action ||
+                  "Review the exposed resource, validate business need, and reduce unnecessary access."}
+              </span>
+            </div>
+          </div>
         ) : null}
       </div>
+
       <div className="finding-action">
-        <Button variant={fixable ? "primary" : "secondary"} disabled={!fixable || busy} onClick={() => fixFinding(finding)}>
+        <Button
+          variant={fixable ? "primary" : "secondary"}
+          disabled={!fixable || busy}
+          onClick={() => fixFinding(finding)}
+        >
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wrench className="h-4 w-4" />}
           {fixable ? "Fix" : "Review"}
         </Button>
