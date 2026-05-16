@@ -331,6 +331,48 @@ function layoutGraph(
   return { flowNodes, flowEdges };
 }
 
+function summarizeAttackPath(
+  activePath: string[],
+  graphData: {
+    nodes: GraphNode[];
+    edges: GraphEdge[];
+  } | null
+) {
+  if (!graphData || !activePath.length) {
+    return [];
+  }
+
+  const nodeLookup = Object.fromEntries(
+    graphData.nodes.map((node) => [node.id, node])
+  );
+
+  const summaries: string[] = [];
+
+  if (activePath.includes("internet")) {
+    summaries.push("Internet reachable");
+  }
+
+  for (const nodeId of activePath) {
+    const node = nodeLookup[nodeId];
+
+    if (!node) continue;
+
+    if (node.type === "iam_role") {
+      summaries.push("IAM privilege escalation path");
+    }
+
+    if (node.crown_jewel) {
+      summaries.push("Crown jewel exposed");
+    }
+
+    if (node.severity === "critical") {
+      summaries.push("Critical asset in attack chain");
+    }
+  }
+
+  return [...new Set(summaries)];
+}
+
 export default function GraphPage() {
     const { activeAccountId } = useSafeOps();
 
@@ -346,6 +388,10 @@ export default function GraphPage() {
     const [blastRadius, setBlastRadius] = useState<any | null>(null);
     const [blastMode, setBlastMode] = useState(false);
     const [blastReachable, setBlastReachable] = useState<string[]>([]);
+    const attackSummary = summarizeAttackPath(
+        activePath,
+        graphData
+    );
 
     useEffect(() => {
         if (!activeAccountId) return;
@@ -415,6 +461,53 @@ export default function GraphPage() {
                     </button>
                 ))}
                 </div>
+            
+            {attackSummary.length ? (
+                <div
+                    style={{
+                    position: "absolute",
+                    top: 90,
+                    left: 20,
+                    zIndex: 20,
+                    width: 320,
+                    padding: 18,
+                    borderRadius: 18,
+                    background: "rgba(7,16,26,.92)",
+                    border: "1px solid rgba(103,232,249,.18)",
+                    color: "#f8fafc",
+                    backdropFilter: "blur(10px)",
+                    }}
+                >
+                    <div
+                    style={{
+                        fontSize: 12,
+                        letterSpacing: "0.14em",
+                        textTransform: "uppercase",
+                        color: "#67e8f9",
+                        marginBottom: 12,
+                        fontWeight: 800,
+                    }}
+                    >
+                    Attack Summary
+                    </div>
+
+                    <ul
+                    style={{
+                        margin: 0,
+                        paddingLeft: 18,
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 8,
+                    }}
+                    >
+                    {attackSummary.map((item) => (
+                        <li key={item}>
+                        {item}
+                        </li>
+                    ))}
+                    </ul>
+                </div>
+            ) : null}
             <ReactFlow
             nodes={nodes}
             edges={edges}
