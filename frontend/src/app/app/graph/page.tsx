@@ -469,7 +469,7 @@ export default function GraphPage() {
                     top: 90,
                     left: 20,
                     zIndex: 20,
-                    width: 320,
+                    width: 340,
                     padding: 18,
                     borderRadius: 18,
                     background: "rgba(7,16,26,.92)",
@@ -488,100 +488,99 @@ export default function GraphPage() {
                         fontWeight: 800,
                     }}
                     >
-                    Attack Summary
+                    Analysis Panel
+                    </div>
+
+                    <div style={{ marginBottom: 18 }}>
+                    <div
+                        style={{
+                        fontSize: 12,
+                        opacity: 0.75,
+                        marginBottom: 10,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.12em",
+                        fontWeight: 800,
+                        }}
+                    >
+                        Attack Summary
                     </div>
 
                     <ul
-                    style={{
+                        style={{
                         margin: 0,
                         paddingLeft: 18,
                         display: "flex",
                         flexDirection: "column",
                         gap: 8,
-                    }}
+                        }}
                     >
-                    {attackSummary.map((item) => (
-                        <li key={item}>
-                        {item}
-                        </li>
-                    ))}
+                        {attackSummary.map((item) => (
+                        <li key={item}>{item}</li>
+                        ))}
                     </ul>
+                    </div>
+
+                    <div>
+                    <div
+                        style={{
+                        fontSize: 12,
+                        opacity: 0.75,
+                        marginBottom: 10,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.12em",
+                        fontWeight: 800,
+                        }}
+                    >
+                        Relationship Types
+                    </div>
+
+                    <div
+                        style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 10,
+                        fontSize: 14,
+                        }}
+                    >
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <div
+                            style={{
+                            width: 28,
+                            height: 4,
+                            borderRadius: 999,
+                            background: "#f87171",
+                            }}
+                        />
+                        <span>Public access</span>
+                        </div>
+
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <div
+                            style={{
+                            width: 28,
+                            height: 4,
+                            borderRadius: 999,
+                            background: "#67e8f9",
+                            }}
+                        />
+                        <span>Can access</span>
+                        </div>
+
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <div
+                            style={{
+                            width: 28,
+                            height: 4,
+                            borderRadius: 999,
+                            background: "#c4b5fd",
+                            }}
+                        />
+                        <span>Can assume</span>
+                        </div>
+                    </div>
+                    </div>
                 </div>
             ) : null}
-
-            <div
-                style={{
-                    position: "absolute",
-                    top: attackSummary.length ? 300 : 90,
-                    left: 20,
-                    zIndex: 20,
-                    padding: 16,
-                    borderRadius: 16,
-                    background: "rgba(7,16,26,.92)",
-                    border: "1px solid rgba(103,232,249,.18)",
-                    color: "#f8fafc",
-                    backdropFilter: "blur(10px)",
-                    minWidth: 220,
-                }}
-                >
-                <div
-                    style={{
-                    fontSize: 12,
-                    letterSpacing: "0.14em",
-                    textTransform: "uppercase",
-                    color: "#67e8f9",
-                    marginBottom: 14,
-                    fontWeight: 800,
-                    }}
-                >
-                    Relationship Types
-                </div>
-
-                <div
-                    style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 10,
-                    fontSize: 14,
-                    }}
-                >
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <div
-                        style={{
-                        width: 28,
-                        height: 4,
-                        borderRadius: 999,
-                        background: "#f87171",
-                        }}
-                    />
-                    <span>Public access</span>
-                    </div>
-
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <div
-                        style={{
-                        width: 28,
-                        height: 4,
-                        borderRadius: 999,
-                        background: "#67e8f9",
-                        }}
-                    />
-                    <span>Can access</span>
-                    </div>
-
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                    <div
-                        style={{
-                        width: 28,
-                        height: 4,
-                        borderRadius: 999,
-                        background: "#c4b5fd",
-                        }}
-                    />
-                    <span>Can assume</span>
-                    </div>
-                </div>
-            </div>
 
             <ReactFlow
             nodes={nodes}
