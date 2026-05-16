@@ -694,12 +694,17 @@ def score_attack_path(path, node_lookup):
     if crown_jewel_reached:
         score += 10
 
+    # multi-hop chains are more dangerous
     if len(path) >= 3:
-        score += 6
+        score += 8
+
+    if len(path) >= 5:
+        score += 10
 
     return {
         "path": path,
         "score": min(score, 95),
+        "hop_count": max(0, len(path) - 1),
         "crown_jewel_reached": crown_jewel_reached,
     }
 

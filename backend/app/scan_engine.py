@@ -291,6 +291,24 @@ def run_scan_and_store(account_id=None):
                 "can_access",
             )
 
+        # lateral movement example:
+        all_roles = (
+            db.query(Asset)
+            .filter(
+                Asset.cloud_account_id == account.id,
+                Asset.asset_type == "iam_role",
+            )
+            .all()
+        )
+
+        if len(all_roles) >= 2:
+            create_relationship(
+                db,
+                all_roles[0],
+                all_roles[1],
+                "can_assume",
+            )
+
         db.commit()
 
         return {"risk_score": risk_score, "findings": len(all_findings)}

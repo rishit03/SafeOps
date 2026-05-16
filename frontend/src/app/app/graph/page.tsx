@@ -37,6 +37,7 @@ type GraphNode = {
 type AttackPath = {
     path: string[];
     score: number;
+    hop_count: number;
     crown_jewel_reached: boolean;
 };
 
@@ -510,7 +511,7 @@ export default function GraphPage() {
                         cursor: "pointer",
                     }}
                     >
-                    Path {index + 1} · {path.score}
+                    Path {index + 1} · {path.score} · {path.hop_count} hops
                     </button>
                 ))}
                 </div>
