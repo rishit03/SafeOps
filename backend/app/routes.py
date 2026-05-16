@@ -129,7 +129,10 @@ def compute_propagated_risk(nodes, edges):
 
     adjacency = {}
     for edge in edges:
-        adjacency.setdefault(edge["source"], []).append(edge["target"])
+        adjacency.setdefault(edge["source"], []).append({
+            "target": edge["target"],
+            "type": edge["type"],
+        })
 
     severity_rank = {
         "low": 1,
@@ -147,22 +150,41 @@ def compute_propagated_risk(nodes, edges):
 
     propagated = {}
 
-    def dfs(source_id, current_id, source_severity_rank, visited):
+    def dfs(source_id, current_id, source_severity_rank, source_node, path, visited):
         if current_id in visited:
             return
 
         visited.add(current_id)
 
-        for neighbor_id in adjacency.get(current_id, []):
+        for neighbor in adjacency.get(current_id, []):
+            neighbor_id = neighbor["target"]
+
             if neighbor_id == source_id:
                 continue
 
-            current_best = propagated.get(neighbor_id, 0)
+            existing = propagated.get(neighbor_id)
 
-            if source_severity_rank > current_best:
-                propagated[neighbor_id] = source_severity_rank
+            if not existing or source_severity_rank > existing["rank"]:
+                propagated[neighbor_id] = {
+                    "rank": source_severity_rank,
+                    "source_id": source_id,
+                    "source_label": source_node.get("label"),
+                    "source_type": source_node.get("type"),
+                    "source_severity": source_node.get("severity"),
+                    "via_relation": neighbor["type"],
+                    "path": path + [neighbor_id],
+                }
 
-            dfs(source_id, neighbor_id, source_severity_rank, visited)
+            dfs(
+                source_id,
+                neighbor_id,
+                source_severity_rank,
+                source_node,
+                path + [neighbor_id],
+                visited,
+            )
+
+        visited.remove(current_id)
 
     for node in nodes:
         node_id = node["id"]
@@ -176,20 +198,23 @@ def compute_propagated_risk(nodes, edges):
         )
 
         if base_rank >= 3:
-            dfs(node_id, node_id, base_rank, set())
+            dfs(node_id, node_id, base_rank, node, [node_id], set())
 
     for node in nodes:
         node_id = node["id"]
+
         base_rank = severity_rank.get(
             (node.get("severity") or "low").lower(),
             1,
         )
 
-        propagated_rank = propagated.get(node_id, base_rank)
+        propagation = propagated.get(node_id)
+        propagated_rank = propagation["rank"] if propagation else base_rank
         effective_rank = max(base_rank, propagated_rank)
 
         node["effective_severity"] = rank_severity.get(effective_rank, "low")
         node["risk_propagated"] = effective_rank > base_rank
+        node["propagation_reason"] = propagation if effective_rank > base_rank else None
 
 
 @router.post("/api/scans", response_model=ScanOut)

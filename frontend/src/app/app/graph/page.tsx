@@ -20,6 +20,15 @@ type GraphNode = {
     severity: string;
     effective_severity?: string;
     risk_propagated?: boolean;
+    propagation_reason?: {
+        rank: number;
+        source_id: string;
+        source_label: string;
+        source_type: string;
+        source_severity: string;
+        via_relation: string;
+        path: string[];
+    } | null;
     criticality_score?: number;
     crown_jewel?: boolean;
 };
@@ -675,8 +684,50 @@ export default function GraphPage() {
 
                 <h2>{selectedAsset.asset.name}</h2>
                 <p style={{ opacity: 0.7, marginBottom: 24 }}>
-                {selectedAsset.asset.type}
+                    {selectedAsset.asset.type}
                 </p>
+
+                {(() => {
+                    const selectedNode = graphData?.nodes.find(
+                        (node) => node.id === String(selectedAsset.asset.id)
+                    );
+
+                    if (!selectedNode?.risk_propagated || !selectedNode.propagation_reason) {
+                        return null;
+                    }
+
+                    return (
+                        <div
+                        style={{
+                            marginBottom: 24,
+                            padding: 14,
+                            borderRadius: 14,
+                            background: "rgba(248,113,113,.10)",
+                            border: "1px solid rgba(248,113,113,.25)",
+                            color: "#fecaca",
+                        }}
+                        >
+                        <div
+                            style={{
+                            fontSize: 12,
+                            textTransform: "uppercase",
+                            letterSpacing: "0.12em",
+                            fontWeight: 800,
+                            marginBottom: 8,
+                            }}
+                        >
+                            Why risk is elevated
+                        </div>
+
+                        <div style={{ lineHeight: 1.5 }}>
+                            Reachable from{" "}
+                            <strong>{selectedNode.propagation_reason.source_label}</strong>{" "}
+                            via{" "}
+                            <strong>{selectedNode.propagation_reason.via_relation}</strong>.
+                        </div>
+                        </div>
+                    );
+                })()}
 
                 <h3>Findings</h3>
 
