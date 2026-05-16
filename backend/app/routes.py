@@ -124,6 +124,73 @@ def compute_blast_radius(asset_id, relationships):
 
     return list(reachable)
 
+def compute_propagated_risk(nodes, edges):
+    node_lookup = {node["id"]: node for node in nodes}
+
+    adjacency = {}
+    for edge in edges:
+        adjacency.setdefault(edge["source"], []).append(edge["target"])
+
+    severity_rank = {
+        "low": 1,
+        "medium": 2,
+        "high": 3,
+        "critical": 4,
+    }
+
+    rank_severity = {
+        1: "low",
+        2: "medium",
+        3: "high",
+        4: "critical",
+    }
+
+    propagated = {}
+
+    def dfs(source_id, current_id, source_severity_rank, visited):
+        if current_id in visited:
+            return
+
+        visited.add(current_id)
+
+        for neighbor_id in adjacency.get(current_id, []):
+            if neighbor_id == source_id:
+                continue
+
+            current_best = propagated.get(neighbor_id, 0)
+
+            if source_severity_rank > current_best:
+                propagated[neighbor_id] = source_severity_rank
+
+            dfs(source_id, neighbor_id, source_severity_rank, visited)
+
+    for node in nodes:
+        node_id = node["id"]
+
+        if node_id == "internet":
+            continue
+
+        base_rank = severity_rank.get(
+            (node.get("severity") or "low").lower(),
+            1,
+        )
+
+        if base_rank >= 3:
+            dfs(node_id, node_id, base_rank, set())
+
+    for node in nodes:
+        node_id = node["id"]
+        base_rank = severity_rank.get(
+            (node.get("severity") or "low").lower(),
+            1,
+        )
+
+        propagated_rank = propagated.get(node_id, base_rank)
+        effective_rank = max(base_rank, propagated_rank)
+
+        node["effective_severity"] = rank_severity.get(effective_rank, "low")
+        node["risk_propagated"] = effective_rank > base_rank
+
 
 @router.post("/api/scans", response_model=ScanOut)
 def create_scan(scan_in: ScanIn, db: Session = Depends(get_db)):
@@ -715,6 +782,8 @@ def get_graph(account_id: int, db: Session = Depends(get_db)):
         }
         for rel in relationships
     ]
+
+    compute_propagated_risk(graph_nodes, graph_edges)
 
     raw_paths = find_attack_paths(graph_nodes, graph_edges)
 

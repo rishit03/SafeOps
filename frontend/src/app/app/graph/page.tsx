@@ -18,6 +18,8 @@ type GraphNode = {
     label: string;
     type: string;
     severity: string;
+    effective_severity?: string;
+    risk_propagated?: boolean;
     criticality_score?: number;
     crown_jewel?: boolean;
 };
@@ -220,7 +222,7 @@ function layoutGraph(
                         fontWeight: 700,
                     }}
                     >
-                    {node.severity}
+                    {node.effective_severity || node.severity}
                     {node.crown_jewel ? (
                         <div
                             style={{
@@ -240,6 +242,24 @@ function layoutGraph(
                         ) : null}
                     </div>
                 </div>
+
+                {node.risk_propagated ? (
+                    <div
+                        style={{
+                        fontSize: 10,
+                        padding: "4px 8px",
+                        borderRadius: 999,
+                        background: "rgba(248,113,113,.18)",
+                        border: "1px solid rgba(248,113,113,.45)",
+                        textTransform: "uppercase",
+                        fontWeight: 800,
+                        marginTop: 6,
+                        color: "#fecaca",
+                        }}
+                    >
+                        Risk elevated
+                    </div>
+                ) : null}
 
                 <div
                     style={{
@@ -279,7 +299,7 @@ function layoutGraph(
                 ? "0 0 60px rgba(248,113,113,.35)"
                 : activePath.includes(node.id)
                 ? "0 0 50px rgba(103,232,249,.45)"
-                : severityGlow(node.severity),
+                : severityGlow(node.effective_severity || node.severity),
         },
     };
   });
