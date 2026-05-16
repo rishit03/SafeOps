@@ -134,6 +134,22 @@ function edgeColor(type: string) {
     return "rgba(148,163,184,.35)";
 }
 
+function edgeDescription(type: string) {
+    if (type === "public_access") {
+        return "Asset reachable from Internet";
+    }
+
+    if (type === "can_access") {
+        return "Asset can access downstream resource";
+    }
+
+    if (type === "can_assume") {
+        return "IAM trust / role assumption possible";
+    }
+
+    return "Relationship detected";
+}
+
 function severityGlow(severity: string) {
     if (severity === "critical") {
         return "0 0 40px rgba(248,113,113,.35)";
@@ -318,6 +334,11 @@ function layoutGraph(
     source: edge.source,
     target: edge.target,
     label: edge.type,
+
+    data: {
+        description: edgeDescription(edge.type),
+    },
+    
     markerEnd: {
       type: MarkerType.ArrowClosed,
     },
@@ -422,6 +443,7 @@ export default function GraphPage() {
         graphData
     );
     const [analysisCollapsed, setAnalysisCollapsed] = useState(false);
+    const [hoveredEdge, setHoveredEdge] = useState<any | null>(null);
 
     useEffect(() => {
         if (!activeAccountId) return;
@@ -640,6 +662,46 @@ export default function GraphPage() {
                 </div>
             ) : null}
 
+            {hoveredEdge ? (
+                <div
+                    style={{
+                    position: "absolute",
+                    bottom: 24,
+                    left: 24,
+                    zIndex: 30,
+                    width: 320,
+                    padding: 16,
+                    borderRadius: 16,
+                    background: "rgba(7,16,26,.96)",
+                    border: "1px solid rgba(103,232,249,.18)",
+                    color: "#f8fafc",
+                    backdropFilter: "blur(10px)",
+                    }}
+                >
+                    <div
+                    style={{
+                        fontSize: 12,
+                        letterSpacing: "0.14em",
+                        textTransform: "uppercase",
+                        color: edgeColor(hoveredEdge.label),
+                        marginBottom: 10,
+                        fontWeight: 800,
+                    }}
+                    >
+                    {hoveredEdge.label}
+                    </div>
+
+                    <div
+                    style={{
+                        lineHeight: 1.5,
+                        opacity: 0.9,
+                    }}
+                    >
+                    {hoveredEdge.data?.description}
+                    </div>
+                </div>
+            ) : null}
+
             <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -647,6 +709,13 @@ export default function GraphPage() {
             onNodeClick={async (_, node) => {
                 const details = await safeopsApi.assetDetails(Number(node.id));
                 setSelectedAsset(details);
+            }}
+            onEdgeMouseEnter={(_, edge) => {
+                setHoveredEdge(edge);
+            }}
+
+            onEdgeMouseLeave={() => {
+                setHoveredEdge(null);
             }}
             >
             <Background />
