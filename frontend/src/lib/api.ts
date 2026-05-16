@@ -108,6 +108,19 @@ export const safeopsApi = {
     request(`/api/assets/${assetId}`),
   blastRadius: (assetId: number) =>
     request<BlastRadiusResponse>(`/api/blast-radius/${assetId}`),
+  findingIntelligence: (findingId: number) =>
+    request<{
+      finding_id: number;
+      asset: {
+        id: number;
+        name: string;
+        type: string;
+      } | null;
+      reachable_asset_count: number;
+      crown_jewel_count: number;
+      crown_jewels: string[];
+      impact_score: number;
+    }>(`/api/findings/${findingId}/intelligence`),
 };
 
 export async function loadSafeOpsBundle(accountId?: number | null): Promise<ApiBundle> {

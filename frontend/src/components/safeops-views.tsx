@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState, type ComponentType } from "react";
+import { useEffect, useMemo, useState, type ComponentType } from "react";
+import { safeopsApi } from "@/lib/api";
 import {
   Activity,
   AlertCircle,
@@ -117,6 +118,16 @@ function FindingRow({ finding, compact = false }: { finding: Finding; compact?: 
   const fingerprint = String(findingFingerprint(finding));
   const fixable = canAutoFix(finding);
   const busy = fixingOne === fingerprint;
+  const [intelligence, setIntelligence] = useState<any | null>(null);
+
+  useEffect(() => {
+    if (compact || !finding.id) return;
+
+    safeopsApi
+      .findingIntelligence(Number(finding.id))
+      .then(setIntelligence)
+      .catch(() => setIntelligence(null));
+  }, [compact, finding.id]);
 
   const isCrownJewelRelated =
     String(finding.raw?.bucket_name || "").toLowerCase().includes("config") ||
@@ -172,11 +183,20 @@ function FindingRow({ finding, compact = false }: { finding: Finding; compact?: 
             <div>
               <strong>Graph context</strong>
               <span>
-                {hasPrivEsc
-                  ? "This identity-related finding may enable privilege escalation or downstream access."
-                  : isCrownJewelRelated
-                  ? "This asset appears to be business-critical or sensitive based on naming context."
-                  : "SafeOps will use asset relationships to determine downstream impact."}
+                {intelligence ? (
+                  <>
+                    Linked asset: {intelligence.asset?.name || "Unknown"} · Reachable assets:{" "}
+                    {intelligence.reachable_asset_count} · Crown jewels exposed:{" "}
+                    {intelligence.crown_jewel_count} · Impact score:{" "}
+                    {intelligence.impact_score}
+                  </>
+                ) : hasPrivEsc ? (
+                  "This identity-related finding may enable privilege escalation or downstream access."
+                ) : isCrownJewelRelated ? (
+                  "This asset appears to be business-critical or sensitive based on naming context."
+                ) : (
+                  "SafeOps will use asset relationships to determine downstream impact."
+                )}
               </span>
             </div>
 
