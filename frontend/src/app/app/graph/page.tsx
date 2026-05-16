@@ -508,6 +508,81 @@ export default function GraphPage() {
                     </ul>
                 </div>
             ) : null}
+
+            <div
+                style={{
+                    position: "absolute",
+                    top: attackSummary.length ? 300 : 90,
+                    left: 20,
+                    zIndex: 20,
+                    padding: 16,
+                    borderRadius: 16,
+                    background: "rgba(7,16,26,.92)",
+                    border: "1px solid rgba(103,232,249,.18)",
+                    color: "#f8fafc",
+                    backdropFilter: "blur(10px)",
+                    minWidth: 220,
+                }}
+                >
+                <div
+                    style={{
+                    fontSize: 12,
+                    letterSpacing: "0.14em",
+                    textTransform: "uppercase",
+                    color: "#67e8f9",
+                    marginBottom: 14,
+                    fontWeight: 800,
+                    }}
+                >
+                    Relationship Types
+                </div>
+
+                <div
+                    style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 10,
+                    fontSize: 14,
+                    }}
+                >
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div
+                        style={{
+                        width: 28,
+                        height: 4,
+                        borderRadius: 999,
+                        background: "#f87171",
+                        }}
+                    />
+                    <span>Public access</span>
+                    </div>
+
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div
+                        style={{
+                        width: 28,
+                        height: 4,
+                        borderRadius: 999,
+                        background: "#67e8f9",
+                        }}
+                    />
+                    <span>Can access</span>
+                    </div>
+
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div
+                        style={{
+                        width: 28,
+                        height: 4,
+                        borderRadius: 999,
+                        background: "#c4b5fd",
+                        }}
+                    />
+                    <span>Can assume</span>
+                    </div>
+                </div>
+            </div>
+
             <ReactFlow
             nodes={nodes}
             edges={edges}
