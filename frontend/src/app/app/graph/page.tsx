@@ -173,7 +173,8 @@ function layoutGraph(
     edges: GraphEdge[],
     activePath: string[],
     blastMode: boolean,
-    blastReachable: string[]
+    blastReachable: string[],
+    searchQuery: string
 ) {
     const dagreGraph = new dagre.graphlib.Graph();
 
@@ -199,6 +200,11 @@ function layoutGraph(
 
     const flowNodes = nodes.map((node) => {
     const position = dagreGraph.node(node.id);
+
+    const matchesSearch =
+        !searchQuery ||
+        node.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        node.type.toLowerCase().includes(searchQuery.toLowerCase());
 
     return {
         id: node.id,
@@ -306,7 +312,9 @@ function layoutGraph(
         style: {
         ...nodeStyle(node.type),
         opacity:
-            blastMode
+            !matchesSearch
+                ? 0.08
+                : blastMode
                 ? blastReachable.includes(node.id)
                 ? 1
                 : 0.12
@@ -314,7 +322,9 @@ function layoutGraph(
                 ? 1
                 : 0.22,
         filter:
-            blastMode
+            !matchesSearch
+                ? "grayscale(100%) blur(1px)"
+                : blastMode
                 ? blastReachable.includes(node.id)
                 ? "none"
                 : "grayscale(100%)"
@@ -487,6 +497,7 @@ export default function GraphPage() {
             : [];
     const [analysisCollapsed, setAnalysisCollapsed] = useState(false);
     const [hoveredEdge, setHoveredEdge] = useState<any | null>(null);
+    const [searchQuery, setSearchQuery] = useState("");
 
     function resetWorkspace() {
         setBlastMode(false);
@@ -530,12 +541,13 @@ export default function GraphPage() {
             graphData.edges,
             activePath,
             blastMode,
-            blastReachable
+            blastReachable,
+            searchQuery
         );
 
         setNodes(flowNodes);
         setEdges(flowEdges);
-    }, [graphData, activePath, blastMode, blastReachable]);
+    }, [graphData, activePath, blastMode, blastReachable, searchQuery]);
 
     return (
         <main style={{ height: "100vh", background: "#05070b", position: "relative" }}>
@@ -593,6 +605,28 @@ export default function GraphPage() {
             >
             Reset Workspace
             </button>
+
+            <input
+                value={searchQuery}
+                onChange={(event) => {
+                    setSearchQuery(event.target.value);
+                }}
+                placeholder="Search assets, IAM roles, buckets..."
+                style={{
+                    position: "absolute",
+                    top: 70,
+                    right: 20,
+                    zIndex: 30,
+                    width: 320,
+                    padding: "12px 14px",
+                    borderRadius: 14,
+                    border: "1px solid rgba(103,232,249,.18)",
+                    background: "rgba(7,16,26,.92)",
+                    color: "#f8fafc",
+                    outline: "none",
+                    backdropFilter: "blur(10px)",
+                }}
+            />
 
             {attackSummary.length ? (
             <div
