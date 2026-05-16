@@ -3,10 +3,11 @@
 import { useEffect, useState } from "react";
 import dagre from "dagre";
 import ReactFlow, {
-  Background,
-  Controls,
-  MarkerType,
-  Position,
+    Background,
+    Controls,
+    MarkerType,
+    MiniMap,
+    Position,
 } from "reactflow";
 import "reactflow/dist/style.css";
 
@@ -720,6 +721,15 @@ export default function GraphPage() {
             >
             <Background />
             <Controls />
+
+            <MiniMap
+                pannable
+                zoomable
+                nodeStrokeColor="#67e8f9"
+                nodeColor="#07101a"
+                nodeBorderRadius={8}
+                maskColor="rgba(5,7,11,.72)"
+            />
             </ReactFlow>
 
             {selectedAsset ? (
