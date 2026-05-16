@@ -412,6 +412,7 @@ export default function GraphPage() {
         activePath,
         graphData
     );
+    const [analysisCollapsed, setAnalysisCollapsed] = useState(false);
 
     useEffect(() => {
         if (!activeAccountId) return;
@@ -496,19 +497,47 @@ export default function GraphPage() {
                     border: "1px solid rgba(103,232,249,.18)",
                     color: "#f8fafc",
                     backdropFilter: "blur(10px)",
+
+                    height: analysisCollapsed ? 64 : "auto",
+                    overflow: "hidden",
+                    transition: "all 0.25s ease",
+                    }}
+                >
+
+                <div
+                    style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        marginBottom: 14,
                     }}
                 >
                     <div
-                    style={{
+                        style={{
                         fontSize: 12,
                         letterSpacing: "0.14em",
                         textTransform: "uppercase",
                         color: "#67e8f9",
-                        marginBottom: 12,
                         fontWeight: 800,
-                    }}
+                        }}
                     >
-                    Analysis Panel
+                        Analysis Panel
+                    </div>
+
+                    <button
+                        onClick={() =>
+                        setAnalysisCollapsed((current) => !current)
+                        }
+                        style={{
+                        background: "transparent",
+                        border: "none",
+                        color: "#94a3b8",
+                        cursor: "pointer",
+                        fontWeight: 700,
+                        }}
+                    >
+                        {analysisCollapsed ? "Expand" : "Collapse"}
+                    </button>
                     </div>
 
                     <div style={{ marginBottom: 18 }}>
