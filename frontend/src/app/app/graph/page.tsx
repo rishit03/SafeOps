@@ -425,6 +425,33 @@ function summarizeAttackPath(
   return [...new Set(summaries)];
 }
 
+function describePathStep(
+  node: GraphNode,
+  previousNode?: GraphNode
+) {
+  if (node.type === "internet") {
+    return "Internet exposure detected";
+  }
+
+  if (node.type === "iam_role") {
+    return `Privilege escalation through ${node.label}`;
+  }
+
+  if (node.type === "s3_bucket") {
+    if (node.crown_jewel) {
+      return `Crown jewel bucket exposed: ${node.label}`;
+    }
+
+    return `S3 bucket reachable: ${node.label}`;
+  }
+
+  if (node.type === "rds_instance") {
+    return `Database reachable: ${node.label}`;
+  }
+
+  return `Asset reachable: ${node.label}`;
+}
+
 export default function GraphPage() {
     const { activeAccountId } = useSafeOps();
 
@@ -444,6 +471,20 @@ export default function GraphPage() {
         activePath,
         graphData
     );
+    const attackTimeline =
+        graphData && activePath.length
+            ? activePath
+                .map((nodeId) =>
+                graphData.nodes.find((node) => node.id === nodeId)
+                )
+                .filter(Boolean)
+                .map((node, index, arr) =>
+                describePathStep(
+                    node as GraphNode,
+                    arr[index - 1] as GraphNode | undefined
+                )
+                )
+            : [];
     const [analysisCollapsed, setAnalysisCollapsed] = useState(false);
     const [hoveredEdge, setHoveredEdge] = useState<any | null>(null);
 
@@ -614,6 +655,67 @@ export default function GraphPage() {
                         }}
                     >
                         Relationship Types
+                    </div>
+
+                    <div style={{ marginTop: 24 }}>
+                        <div
+                            style={{
+                            fontSize: 12,
+                            opacity: 0.75,
+                            marginBottom: 10,
+                            textTransform: "uppercase",
+                            letterSpacing: "0.12em",
+                            fontWeight: 800,
+                            }}
+                        >
+                            Attack Timeline
+                        </div>
+
+                        <div
+                            style={{
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 14,
+                            }}
+                        >
+                            {attackTimeline.map((step, index) => (
+                            <div
+                                key={`${index}-${step}`}
+                                style={{
+                                display: "flex",
+                                gap: 12,
+                                alignItems: "flex-start",
+                                }}
+                            >
+                                <div
+                                style={{
+                                    minWidth: 26,
+                                    height: 26,
+                                    borderRadius: 999,
+                                    background: "rgba(103,232,249,.18)",
+                                    border: "1px solid rgba(103,232,249,.35)",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    fontSize: 12,
+                                    fontWeight: 800,
+                                    color: "#67e8f9",
+                                }}
+                                >
+                                {index + 1}
+                                </div>
+
+                                <div
+                                style={{
+                                    lineHeight: 1.5,
+                                    opacity: 0.92,
+                                }}
+                                >
+                                {step}
+                                </div>
+                            </div>
+                            ))}
+                        </div>
                     </div>
 
                     <div
