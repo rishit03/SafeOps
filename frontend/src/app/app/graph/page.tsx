@@ -488,6 +488,19 @@ export default function GraphPage() {
     const [analysisCollapsed, setAnalysisCollapsed] = useState(false);
     const [hoveredEdge, setHoveredEdge] = useState<any | null>(null);
 
+    function resetWorkspace() {
+        setBlastMode(false);
+        setBlastReachable([]);
+        setBlastRadius(null);
+        setSelectedAsset(null);
+
+        if (attackPaths.length) {
+            setActivePath(attackPaths[0].path);
+        } else {
+            setActivePath([]);
+        }
+    }
+
     useEffect(() => {
         if (!activeAccountId) return;
 
@@ -527,283 +540,260 @@ export default function GraphPage() {
     return (
         <main style={{ height: "100vh", background: "#05070b", position: "relative" }}>
             <div
+            style={{
+                position: "absolute",
+                top: 20,
+                left: 20,
+                zIndex: 20,
+                display: "flex",
+                gap: 10,
+            }}
+            >
+            {attackPaths.map((path, index) => (
+                <button
+                key={index}
+                onClick={() => {
+                    setBlastMode(false);
+                    setBlastReachable([]);
+                    setActivePath(path.path);
+                }}
                 style={{
-                    position: "absolute",
-                    top: 20,
-                    left: 20,
-                    zIndex: 20,
-                    display: "flex",
-                    gap: 10,
+                    padding: "8px 14px",
+                    borderRadius: 999,
+                    border: "1px solid rgba(103,232,249,.25)",
+                    background:
+                    activePath.join(",") === path.path.join(",")
+                        ? "rgba(8,145,178,.3)"
+                        : "rgba(15,23,42,.8)",
+                    color: "#f8fafc",
+                    cursor: "pointer",
                 }}
                 >
-                {attackPaths.map((path, index) => (
-                    <button
-                    key={index}
-                    onClick={() => setActivePath(path.path)}
-                    style={{
-                        padding: "8px 14px",
-                        borderRadius: 999,
-                        border: "1px solid rgba(103,232,249,.25)",
-                        background:
-                        activePath.join(",") === path.path.join(",")
-                            ? "rgba(8,145,178,.3)"
-                            : "rgba(15,23,42,.8)",
-                        color: "#f8fafc",
-                        cursor: "pointer",
-                    }}
-                    >
-                    Path {index + 1} · {path.score} · {path.hop_count} hops
-                    </button>
-                ))}
-                </div>
-            
+                Path {index + 1} · {path.score} · {path.hop_count} hops
+                </button>
+            ))}
+            </div>
+
+            <button
+            onClick={resetWorkspace}
+            style={{
+                position: "absolute",
+                top: 20,
+                right: 20,
+                zIndex: 30,
+                padding: "10px 16px",
+                borderRadius: 14,
+                border: "1px solid rgba(248,113,113,.25)",
+                background: "rgba(127,29,29,.18)",
+                color: "#f8fafc",
+                fontWeight: 700,
+                cursor: "pointer",
+                backdropFilter: "blur(10px)",
+            }}
+            >
+            Reset Workspace
+            </button>
+
             {attackSummary.length ? (
+            <div
+                style={{
+                position: "absolute",
+                top: 90,
+                left: 20,
+                zIndex: 20,
+                width: 340,
+                padding: 18,
+                borderRadius: 18,
+                background: "rgba(7,16,26,.92)",
+                border: "1px solid rgba(103,232,249,.18)",
+                color: "#f8fafc",
+                backdropFilter: "blur(10px)",
+                height: analysisCollapsed ? 64 : "auto",
+                overflow: "hidden",
+                transition: "all 0.25s ease",
+                }}
+            >
+                <div
+                style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: 14,
+                }}
+                >
                 <div
                     style={{
-                    position: "absolute",
-                    top: 90,
-                    left: 20,
-                    zIndex: 20,
-                    width: 340,
-                    padding: 18,
-                    borderRadius: 18,
-                    background: "rgba(7,16,26,.92)",
-                    border: "1px solid rgba(103,232,249,.18)",
-                    color: "#f8fafc",
-                    backdropFilter: "blur(10px)",
-
-                    height: analysisCollapsed ? 64 : "auto",
-                    overflow: "hidden",
-                    transition: "all 0.25s ease",
+                    fontSize: 12,
+                    letterSpacing: "0.14em",
+                    textTransform: "uppercase",
+                    color: "#67e8f9",
+                    fontWeight: 800,
                     }}
                 >
+                    Analysis Panel
+                </div>
 
+                <button
+                    onClick={() => setAnalysisCollapsed((current) => !current)}
+                    style={{
+                    background: "transparent",
+                    border: "none",
+                    color: "#94a3b8",
+                    cursor: "pointer",
+                    fontWeight: 700,
+                    }}
+                >
+                    {analysisCollapsed ? "Expand" : "Collapse"}
+                </button>
+                </div>
+
+                <div style={{ marginBottom: 22 }}>
                 <div
                     style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        marginBottom: 14,
+                    fontSize: 12,
+                    opacity: 0.75,
+                    marginBottom: 10,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.12em",
+                    fontWeight: 800,
                     }}
                 >
+                    Attack Summary
+                </div>
+
+                <ul
+                    style={{
+                    margin: 0,
+                    paddingLeft: 18,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8,
+                    }}
+                >
+                    {attackSummary.map((item) => (
+                    <li key={item}>{item}</li>
+                    ))}
+                </ul>
+                </div>
+
+                <div style={{ marginBottom: 22 }}>
+                <div
+                    style={{
+                    fontSize: 12,
+                    opacity: 0.75,
+                    marginBottom: 10,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.12em",
+                    fontWeight: 800,
+                    }}
+                >
+                    Attack Timeline
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                    {attackTimeline.map((step, index) => (
                     <div
-                        style={{
-                        fontSize: 12,
-                        letterSpacing: "0.14em",
-                        textTransform: "uppercase",
-                        color: "#67e8f9",
-                        fontWeight: 800,
-                        }}
+                        key={`${index}-${step}`}
+                        style={{ display: "flex", gap: 12, alignItems: "flex-start" }}
                     >
-                        Analysis Panel
-                    </div>
-
-                    <button
-                        onClick={() =>
-                        setAnalysisCollapsed((current) => !current)
-                        }
-                        style={{
-                        background: "transparent",
-                        border: "none",
-                        color: "#94a3b8",
-                        cursor: "pointer",
-                        fontWeight: 700,
-                        }}
-                    >
-                        {analysisCollapsed ? "Expand" : "Collapse"}
-                    </button>
-                    </div>
-
-                    <div style={{ marginBottom: 18 }}>
-                    <div
-                        style={{
-                        fontSize: 12,
-                        opacity: 0.75,
-                        marginBottom: 10,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.12em",
-                        fontWeight: 800,
-                        }}
-                    >
-                        Attack Summary
-                    </div>
-
-                    <ul
-                        style={{
-                        margin: 0,
-                        paddingLeft: 18,
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 8,
-                        }}
-                    >
-                        {attackSummary.map((item) => (
-                        <li key={item}>{item}</li>
-                        ))}
-                    </ul>
-                    </div>
-
-                    <div>
-                    <div
-                        style={{
-                        fontSize: 12,
-                        opacity: 0.75,
-                        marginBottom: 10,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.12em",
-                        fontWeight: 800,
-                        }}
-                    >
-                        Relationship Types
-                    </div>
-
-                    <div style={{ marginTop: 24 }}>
                         <div
-                            style={{
-                            fontSize: 12,
-                            opacity: 0.75,
-                            marginBottom: 10,
-                            textTransform: "uppercase",
-                            letterSpacing: "0.12em",
-                            fontWeight: 800,
-                            }}
-                        >
-                            Attack Timeline
-                        </div>
-
-                        <div
-                            style={{
+                        style={{
+                            minWidth: 26,
+                            height: 26,
+                            borderRadius: 999,
+                            background: "rgba(103,232,249,.18)",
+                            border: "1px solid rgba(103,232,249,.35)",
                             display: "flex",
-                            flexDirection: "column",
-                            gap: 14,
-                            }}
-                        >
-                            {attackTimeline.map((step, index) => (
-                            <div
-                                key={`${index}-${step}`}
-                                style={{
-                                display: "flex",
-                                gap: 12,
-                                alignItems: "flex-start",
-                                }}
-                            >
-                                <div
-                                style={{
-                                    minWidth: 26,
-                                    height: 26,
-                                    borderRadius: 999,
-                                    background: "rgba(103,232,249,.18)",
-                                    border: "1px solid rgba(103,232,249,.35)",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    fontSize: 12,
-                                    fontWeight: 800,
-                                    color: "#67e8f9",
-                                }}
-                                >
-                                {index + 1}
-                                </div>
-
-                                <div
-                                style={{
-                                    lineHeight: 1.5,
-                                    opacity: 0.92,
-                                }}
-                                >
-                                {step}
-                                </div>
-                            </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    <div
-                        style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 10,
-                        fontSize: 14,
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: 12,
+                            fontWeight: 800,
+                            color: "#67e8f9",
                         }}
-                    >
-                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <div
-                            style={{
-                            width: 28,
-                            height: 4,
-                            borderRadius: 999,
-                            background: "#f87171",
-                            }}
-                        />
-                        <span>Public access</span>
+                        >
+                        {index + 1}
                         </div>
 
-                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <div
-                            style={{
-                            width: 28,
-                            height: 4,
-                            borderRadius: 999,
-                            background: "#67e8f9",
-                            }}
-                        />
-                        <span>Can access</span>
-                        </div>
-
-                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <div
-                            style={{
-                            width: 28,
-                            height: 4,
-                            borderRadius: 999,
-                            background: "#c4b5fd",
-                            }}
-                        />
-                        <span>Can assume</span>
-                        </div>
+                        <div style={{ lineHeight: 1.5, opacity: 0.92 }}>{step}</div>
                     </div>
+                    ))}
+                </div>
+                </div>
+
+                <div>
+                <div
+                    style={{
+                    fontSize: 12,
+                    opacity: 0.75,
+                    marginBottom: 10,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.12em",
+                    fontWeight: 800,
+                    }}
+                >
+                    Relationship Types
+                </div>
+
+                <div
+                    style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 10,
+                    fontSize: 14,
+                    }}
+                >
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ width: 28, height: 4, borderRadius: 999, background: "#f87171" }} />
+                    <span>Public access</span>
+                    </div>
+
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ width: 28, height: 4, borderRadius: 999, background: "#67e8f9" }} />
+                    <span>Can access</span>
+                    </div>
+
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ width: 28, height: 4, borderRadius: 999, background: "#c4b5fd" }} />
+                    <span>Can assume</span>
                     </div>
                 </div>
+                </div>
+            </div>
             ) : null}
 
             {hoveredEdge ? (
+            <div
+                style={{
+                position: "absolute",
+                bottom: 24,
+                left: 24,
+                zIndex: 30,
+                width: 320,
+                padding: 16,
+                borderRadius: 16,
+                background: "rgba(7,16,26,.96)",
+                border: "1px solid rgba(103,232,249,.18)",
+                color: "#f8fafc",
+                backdropFilter: "blur(10px)",
+                }}
+            >
                 <div
-                    style={{
-                    position: "absolute",
-                    bottom: 24,
-                    left: 24,
-                    zIndex: 30,
-                    width: 320,
-                    padding: 16,
-                    borderRadius: 16,
-                    background: "rgba(7,16,26,.96)",
-                    border: "1px solid rgba(103,232,249,.18)",
-                    color: "#f8fafc",
-                    backdropFilter: "blur(10px)",
-                    }}
+                style={{
+                    fontSize: 12,
+                    letterSpacing: "0.14em",
+                    textTransform: "uppercase",
+                    color: edgeColor(String(hoveredEdge.label)),
+                    marginBottom: 10,
+                    fontWeight: 800,
+                }}
                 >
-                    <div
-                    style={{
-                        fontSize: 12,
-                        letterSpacing: "0.14em",
-                        textTransform: "uppercase",
-                        color: edgeColor(hoveredEdge.label),
-                        marginBottom: 10,
-                        fontWeight: 800,
-                    }}
-                    >
-                    {hoveredEdge.label}
-                    </div>
-
-                    <div
-                    style={{
-                        lineHeight: 1.5,
-                        opacity: 0.9,
-                    }}
-                    >
-                    {hoveredEdge.data?.description}
-                    </div>
+                {hoveredEdge.label}
                 </div>
+
+                <div style={{ lineHeight: 1.5, opacity: 0.9 }}>
+                {hoveredEdge.data?.description}
+                </div>
+            </div>
             ) : null}
 
             <ReactFlow
@@ -814,17 +804,11 @@ export default function GraphPage() {
                 const details = await safeopsApi.assetDetails(Number(node.id));
                 setSelectedAsset(details);
             }}
-            onEdgeMouseEnter={(_, edge) => {
-                setHoveredEdge(edge);
-            }}
-
-            onEdgeMouseLeave={() => {
-                setHoveredEdge(null);
-            }}
+            onEdgeMouseEnter={(_, edge) => setHoveredEdge(edge)}
+            onEdgeMouseLeave={() => setHoveredEdge(null)}
             >
             <Background />
             <Controls />
-
             <MiniMap
                 pannable
                 zoomable
@@ -865,50 +849,50 @@ export default function GraphPage() {
                 </button>
 
                 <h2>{selectedAsset.asset.name}</h2>
+
                 <p style={{ opacity: 0.7, marginBottom: 24 }}>
-                    {selectedAsset.asset.type}
+                {selectedAsset.asset.type}
                 </p>
 
                 {(() => {
-                    const selectedNode = graphData?.nodes.find(
-                        (node) => node.id === String(selectedAsset.asset.id)
-                    );
+                const selectedNode = graphData?.nodes.find(
+                    (node) => node.id === String(selectedAsset.asset.id)
+                );
 
-                    if (!selectedNode?.risk_propagated || !selectedNode.propagation_reason) {
-                        return null;
-                    }
+                if (!selectedNode?.risk_propagated || !selectedNode.propagation_reason) {
+                    return null;
+                }
 
-                    return (
-                        <div
+                return (
+                    <div
+                    style={{
+                        marginBottom: 24,
+                        padding: 14,
+                        borderRadius: 14,
+                        background: "rgba(248,113,113,.10)",
+                        border: "1px solid rgba(248,113,113,.25)",
+                        color: "#fecaca",
+                    }}
+                    >
+                    <div
                         style={{
-                            marginBottom: 24,
-                            padding: 14,
-                            borderRadius: 14,
-                            background: "rgba(248,113,113,.10)",
-                            border: "1px solid rgba(248,113,113,.25)",
-                            color: "#fecaca",
+                        fontSize: 12,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.12em",
+                        fontWeight: 800,
+                        marginBottom: 8,
                         }}
-                        >
-                        <div
-                            style={{
-                            fontSize: 12,
-                            textTransform: "uppercase",
-                            letterSpacing: "0.12em",
-                            fontWeight: 800,
-                            marginBottom: 8,
-                            }}
-                        >
-                            Why risk is elevated
-                        </div>
+                    >
+                        Why risk is elevated
+                    </div>
 
-                        <div style={{ lineHeight: 1.5 }}>
-                            Reachable from{" "}
-                            <strong>{selectedNode.propagation_reason.source_label}</strong>{" "}
-                            via{" "}
-                            <strong>{selectedNode.propagation_reason.via_relation}</strong>.
-                        </div>
-                        </div>
-                    );
+                    <div style={{ lineHeight: 1.5 }}>
+                        Reachable from{" "}
+                        <strong>{selectedNode.propagation_reason.source_label}</strong>{" "}
+                        via <strong>{selectedNode.propagation_reason.via_relation}</strong>.
+                    </div>
+                    </div>
+                );
                 })()}
 
                 <h3>Findings</h3>
@@ -938,92 +922,83 @@ export default function GraphPage() {
                 )}
 
                 <button
-                    onClick={async () => {
-                        const result = await safeopsApi.blastRadius(
-                            Number(selectedAsset.asset.id)
-                        );
+                onClick={async () => {
+                    const result = await safeopsApi.blastRadius(
+                    Number(selectedAsset.asset.id)
+                    );
 
-                        setBlastRadius(result);
-
-                        setBlastMode(true);
-
-                        setBlastReachable([
-                            String(selectedAsset.asset.id),
-                            ...result.reachable_assets.map((asset: any) =>
-                            String(asset.id)
-                            ),
-                        ]);
-                    }}
-                    style={{
-                        marginTop: 20,
-                        padding: "10px 14px",
-                        borderRadius: 12,
-                        border: "1px solid rgba(103,232,249,.25)",
-                        background: "rgba(8,145,178,.2)",
-                        color: "#f8fafc",
-                        cursor: "pointer",
-                        fontWeight: 700,
-                    }}
-                    >
-                    Analyze Blast Radius
+                    setBlastRadius(result);
+                    setBlastMode(true);
+                    setBlastReachable([
+                    String(selectedAsset.asset.id),
+                    ...result.reachable_assets.map((asset) => String(asset.id)),
+                    ]);
+                }}
+                style={{
+                    marginTop: 20,
+                    padding: "10px 14px",
+                    borderRadius: 12,
+                    border: "1px solid rgba(103,232,249,.25)",
+                    background: "rgba(8,145,178,.2)",
+                    color: "#f8fafc",
+                    cursor: "pointer",
+                    fontWeight: 700,
+                }}
+                >
+                Analyze Blast Radius
                 </button>
 
                 <button
-                    onClick={() => {
-                        setBlastMode(false);
-                        setBlastReachable([]);
-                    }}
-                    style={{
-                        marginTop: 10,
-                        padding: "10px 14px",
-                        borderRadius: 12,
-                        border: "1px solid rgba(248,113,113,.25)",
-                        background: "rgba(127,29,29,.2)",
-                        color: "#f8fafc",
-                        cursor: "pointer",
-                        fontWeight: 700,
-                    }}
-                    >
-                    Exit Blast Mode
+                onClick={() => {
+                    setBlastMode(false);
+                    setBlastReachable([]);
+
+                    if (attackPaths.length) {
+                    setActivePath(attackPaths[0].path);
+                    }
+                }}
+                style={{
+                    marginTop: 10,
+                    padding: "10px 14px",
+                    borderRadius: 12,
+                    border: "1px solid rgba(248,113,113,.25)",
+                    background: "rgba(127,29,29,.2)",
+                    color: "#f8fafc",
+                    cursor: "pointer",
+                    fontWeight: 700,
+                }}
+                >
+                Exit Blast Mode
                 </button>
 
                 {blastRadius ? (
-                    <div
-                        style={{
-                        marginTop: 24,
-                        padding: 16,
-                        borderRadius: 14,
-                        background: "rgba(255,255,255,.04)",
-                        }}
-                    >
-                        <h3>Blast Radius</h3>
+                <div
+                    style={{
+                    marginTop: 24,
+                    padding: 16,
+                    borderRadius: 14,
+                    background: "rgba(255,255,255,.04)",
+                    }}
+                >
+                    <h3>Blast Radius</h3>
 
-                        <p>
-                            Reachable assets: {blastRadius.reachable_asset_count}
-                        </p>
+                    <p>Reachable assets: {blastRadius.reachable_asset_count}</p>
+                    <p>Crown jewels exposed: {blastRadius.crown_jewel_count}</p>
+                    <p>Impact score: {blastRadius.impact_score}</p>
 
-                        <p>
-                            Crown jewels exposed: {blastRadius.crown_jewel_count}
-                        </p>
+                    {blastRadius.crown_jewels.length ? (
+                    <div style={{ marginTop: 12 }}>
+                        <strong>Crown jewels reachable:</strong>
 
-                        <p>
-                            Impact score: {blastRadius.impact_score}
-                        </p>
-
-                        {blastRadius.crown_jewels.length ? (
-                        <div style={{ marginTop: 12 }}>
-                            <strong>Crown jewels reachable:</strong>
-
-                            <ul>
-                            {blastRadius.crown_jewels.map((name: string) => (
-                                <li key={name}>{name}</li>
-                            ))}
-                            </ul>
-                        </div>
-                        ) : null}
+                        <ul>
+                        {blastRadius.crown_jewels.map((name: string) => (
+                            <li key={name}>{name}</li>
+                        ))}
+                        </ul>
                     </div>
                     ) : null}
-
+                </div>
+                ) : null}
             </div>
             ) : null}
         </main>
