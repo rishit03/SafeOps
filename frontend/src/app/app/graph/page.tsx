@@ -1020,16 +1020,46 @@ export default function GraphPage() {
                     <p>Crown jewels exposed: {blastRadius.crown_jewel_count}</p>
                     <p>Impact score: {blastRadius.impact_score}</p>
 
-                    {blastRadius.crown_jewels.length ? (
-                    <div style={{ marginTop: 12 }}>
-                        <strong>Crown jewels reachable:</strong>
+                    {blastRadius.crown_jewel_count > 0 ? (
+                        <div style={{ marginTop: 16 }}>
+                            <strong>Crown jewels reachable:</strong>
 
-                        <ul>
-                        {blastRadius.crown_jewels.map((name: string) => (
-                            <li key={name}>{name}</li>
-                        ))}
-                        </ul>
-                    </div>
+                            <div
+                            style={{
+                                marginTop: 12,
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: 14,
+                            }}
+                            >
+                            {Object.entries(blastRadius.crown_jewel_groups || {}).map(
+                                ([category, assets]) => (
+                                <div key={category}>
+                                    <div
+                                    style={{
+                                        fontSize: 12,
+                                        textTransform: "uppercase",
+                                        letterSpacing: "0.1em",
+                                        color: "#fde68a",
+                                        fontWeight: 800,
+                                        marginBottom: 6,
+                                    }}
+                                    >
+                                    {category}
+                                    </div>
+
+                                    <ul style={{ margin: 0, paddingLeft: 18 }}>
+                                    {assets.map((asset) => (
+                                        <li key={asset.id}>
+                                        {asset.name}
+                                        </li>
+                                    ))}
+                                    </ul>
+                                </div>
+                                )
+                            )}
+                            </div>
+                        </div>
                     ) : null}
                 </div>
                 ) : null}

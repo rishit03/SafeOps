@@ -709,6 +709,26 @@ def score_attack_path(path, node_lookup):
         "crown_jewel_reached": crown_jewel_reached,
     }
 
+def crown_jewel_category(asset_name: str):
+    name = (asset_name or "").lower()
+
+    if any(keyword in name for keyword in ["prod", "production"]):
+        return "Production"
+
+    if any(keyword in name for keyword in ["secret", "credential", "key"]):
+        return "Secrets"
+
+    if any(keyword in name for keyword in ["customer", "pii", "user"]):
+        return "Customer Data"
+
+    if any(keyword in name for keyword in ["backup", "archive"]):
+        return "Backups"
+
+    if any(keyword in name for keyword in ["config", "infra", "terraform"]):
+        return "Infrastructure Config"
+
+    return "Other Critical Assets"
+
 @router.get("/api/graph")
 def get_graph(account_id: int, db: Session = Depends(get_db)):
     assets = (
@@ -928,6 +948,8 @@ def get_blast_radius(asset_id: int, db: Session = Depends(get_db)):
 
     crown_jewels = []
 
+    crown_jewel_groups = {}
+
     for reachable_asset in reachable_assets:
         name = (reachable_asset.name or "").lower()
 
@@ -944,6 +966,14 @@ def get_blast_radius(asset_id: int, db: Session = Depends(get_db)):
             ]
         ):
             crown_jewels.append(reachable_asset.name)
+
+            category = crown_jewel_category(reachable_asset.name)
+
+            crown_jewel_groups.setdefault(category, []).append({
+                "id": reachable_asset.id,
+                "name": reachable_asset.name,
+                "type": reachable_asset.asset_type,
+            })
 
     return {
         "source_asset": asset.name,
@@ -962,6 +992,8 @@ def get_blast_radius(asset_id: int, db: Session = Depends(get_db)):
         "crown_jewels": crown_jewels,
 
         "crown_jewel_count": len(crown_jewels),
+
+        "crown_jewel_groups": crown_jewel_groups,
 
         "impact_score": min(
             100,

@@ -15,6 +15,16 @@ export type BlastRadiusResponse = {
   crown_jewel_count: number;
 
   impact_score: number;
+
+  crown_jewel_groups: Record<
+    string,
+    Array<{
+      id: number;
+      name: string;
+      type: string;
+    }>
+  >;
+
 };
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || "";
