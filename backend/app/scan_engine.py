@@ -5,12 +5,11 @@ from safeops.cloud.aws.iam_scanner import scan_publicly_assumable_roles
 import os
 
 from app.database import SessionLocal
-from app.models import Scan, Finding, WorkspaceSettings, Asset, AssetRelationship
+from app.models import Scan, Finding, WorkspaceSettings, Asset, AssetRelationship, CloudAccount
 from safeops.alerts.slack import send_slack_alert
 from safeops.cloud.aws.iam_priv_esc_scanner import scan_iam_privilege_escalation
 from safeops.cloud.aws.attack_path_scanner import detect_attack_paths
 from safeops.engine.fix_prioritizer import classify_fix
-from app.models import CloudAccount
 
 
 
@@ -122,6 +121,34 @@ def create_relationship(db, from_asset, to_asset, relation_type):
             relation_type=relation_type,
         )
     )
+
+def create_relationship_if_missing(db, from_asset, to_asset, relation_type):
+    if not from_asset or not to_asset:
+        return None
+
+    existing = (
+        db.query(AssetRelationship)
+        .filter(
+            AssetRelationship.from_asset_id == from_asset.id,
+            AssetRelationship.to_asset_id == to_asset.id,
+            AssetRelationship.relation_type == relation_type,
+        )
+        .first()
+    )
+
+    if existing:
+        return existing
+
+    relationship = AssetRelationship(
+        from_asset_id=from_asset.id,
+        to_asset_id=to_asset.id,
+        relation_type=relation_type,
+    )
+
+    db.add(relationship)
+    db.flush()
+
+    return relationship
 
 def run_scan_and_store(account_id=None):
     db = SessionLocal()
@@ -308,6 +335,37 @@ def run_scan_and_store(account_id=None):
                 all_roles[1],
                 "can_assume",
             )
+
+        iam_assets = (
+            db.query(Asset)
+            .filter(
+                Asset.cloud_account_id == account.id,
+                Asset.asset_type == "iam_role",
+            )
+            .all()
+        )
+
+        priv_esc_assets = [
+            asset for asset in iam_assets
+            if any(
+                finding.asset_id == asset.id
+                and finding.severity
+                and finding.severity.lower() == "critical"
+                for finding in db.query(Finding).filter(Finding.scan_id == scan.id).all()
+            )
+        ]
+
+        for source_role in priv_esc_assets:
+            for target_role in iam_assets:
+                if source_role.id == target_role.id:
+                    continue
+
+                create_relationship_if_missing(
+                    db,
+                    source_role,
+                    target_role,
+                    "can_assume",
+                )
 
         db.commit()
 

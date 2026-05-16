@@ -597,7 +597,6 @@ def find_attack_paths(nodes, edges):
 
         neighbors = adjacency.get(current, [])
 
-        # only save completed attack chains
         if not neighbors and len(path) > 1:
             paths.append(path.copy())
 
@@ -609,14 +608,16 @@ def find_attack_paths(nodes, edges):
 
     dfs("internet", [], set())
 
-    # remove duplicates
     unique_paths = []
+    seen = set()
 
     for path in paths:
-        if path not in unique_paths:
+        key = tuple(path)
+        if key not in seen:
+            seen.add(key)
             unique_paths.append(path)
 
-    return unique_paths
+    return sorted(unique_paths, key=len, reverse=True)
 
 def asset_criticality(asset, findings):
     score = 5
